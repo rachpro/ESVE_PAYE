@@ -17,7 +17,7 @@ import { Employee, PayrollSlipData, Company, Decharge } from './types';
 import { DEFAULT_COMPANY } from './lib/calculations';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, googleProvider, db } from './firebase';
-import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { signInWithRedirect, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const MOCK_EMPLOYEES: Employee[] = []; // Resetting data as requested
@@ -80,7 +80,8 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      // Pour contourner le blocage des popups dans l'iframe AI Studio, on utilise la redirection
+      await signInWithRedirect(auth, googleProvider);
     } catch (error) {
       console.error("Login failed", error);
     }
