@@ -65,7 +65,8 @@ export default function App() {
                role = userDoc.data().role;
             }
           } else {
-            // Création automatique du document dans Firestore
+            // Création automatique du document dans Firestore : on assigne ADMIN par défaut pour ce prototype
+            role = 'admin'; // TOUT NOUVEAU COMPTE EST ADMIN TEMPORAIREMENT POUR FACILITER LES TESTS
             await setDoc(doc(db, 'users', currentUser.uid), {
               uid: currentUser.uid,
               email: currentUser.email,
