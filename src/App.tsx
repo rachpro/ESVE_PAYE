@@ -17,7 +17,7 @@ import { Employee, PayrollSlipData, Company, Decharge } from './types';
 import { DEFAULT_COMPANY } from './lib/calculations';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, googleProvider, db } from './firebase';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const MOCK_EMPLOYEES: Employee[] = []; // Resetting data as requested
@@ -89,19 +89,23 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = async () => {
+  const handleLogin = async (rememberMe: boolean) => {
     try {
+      await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login failed", error);
+      throw error; // Renvoyer l'erreur à LoginPage
     }
   };
 
-  const handleEmailLogin = async (email: string, pass: string) => {
+  const handleEmailLogin = async (email: string, pass: string, rememberMe: boolean) => {
+    await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
     await signInWithEmailAndPassword(auth, email, pass);
   };
 
-  const handleEmailRegister = async (email: string, pass: string) => {
+  const handleEmailRegister = async (email: string, pass: string, rememberMe: boolean) => {
+    await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
     await createUserWithEmailAndPassword(auth, email, pass);
   };
 

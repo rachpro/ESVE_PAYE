@@ -45,6 +45,9 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data }) => {
         allowTaint: false,
         backgroundColor: '#ffffff',
         logging: true, // Enable for debugging in browser console
+        scrollY: -window.scrollY,
+        windowHeight: element.scrollHeight,
+        height: element.scrollHeight,
       });
       
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -56,9 +59,19 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data }) => {
       });
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfPageHeight = pdf.internal.pageSize.getHeight();
       
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      let finalWidth = pdfWidth;
+      let finalHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      if (finalHeight > pdfPageHeight) {
+        finalHeight = pdfPageHeight;
+        finalWidth = (canvas.width * pdfPageHeight) / canvas.height;
+      }
+      
+      const xOffset = (pdfWidth - finalWidth) / 2;
+      
+      pdf.addImage(imgData, 'JPEG', xOffset, 0, finalWidth, finalHeight);
       
       // Attempt download and provide fallback if needed
       try {

@@ -65,6 +65,9 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
         allowTaint: false,
         backgroundColor: '#ffffff',
         logging: true,
+        scrollY: -window.scrollY,
+        windowHeight: element.scrollHeight,
+        height: element.scrollHeight,
       });
       
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -76,9 +79,21 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
       });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfPageHeight = pdf.internal.pageSize.getHeight();
       
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      let finalWidth = pdfWidth;
+      let finalHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      // Si la hauteur dépasse celle de la page A4, on rétrécit pour que tout rentre sur une seule page
+      if (finalHeight > pdfPageHeight) {
+        finalHeight = pdfPageHeight;
+        finalWidth = (canvas.width * pdfPageHeight) / canvas.height;
+      }
+      
+      // On centre horizontalement si c'est plus étroit
+      const xOffset = (pdfWidth - finalWidth) / 2;
+      
+      pdf.addImage(imgData, 'JPEG', xOffset, 0, finalWidth, finalHeight);
 
       // Attempt download and provide fallback if needed
       try {

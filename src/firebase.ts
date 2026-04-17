@@ -1,11 +1,20 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, orderBy, onSnapshot, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC31ZElHyWtaN5H265BnXICV6fAhn7M_m0",
+  authDomain: "esvepaye.firebaseapp.com",
+  projectId: "esvepaye",
+  storageBucket: "esvepaye.firebasestorage.app",
+  messagingSenderId: "262113660332",
+  appId: "1:262113660332:web:1fdd4ae1d65404048afe09",
+  measurementId: "G-3KRVNRYYKB"
+};
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
 
 export enum OperationType {
