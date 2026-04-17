@@ -195,25 +195,50 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave }) => {
           <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-[#64748b] flex items-center gap-2">
               <ImageIcon size={14} />
-              URL du Logo
+              Logo de l'entreprise
             </label>
             <div className="flex gap-4 items-center">
-              <input
-                type="text"
-                name="logo"
-                value={formData.logo || ''}
-                onChange={handleChange}
-                placeholder="https://example.com/logo.png"
-                className="flex-1 px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
-              />
+              <div className="flex-1 space-y-2">
+                <input
+                  type="text"
+                  name="logo"
+                  value={formData.logo || ''}
+                  onChange={handleChange}
+                  placeholder="URL de l'image (Ex: https://...)"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
+                />
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setFormData(prev => ({ ...prev, logo: reader.result as string }));
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="w-full px-4 py-2 bg-[#f8fafc] border border-dashed border-[#cbd5e1] rounded-lg text-sm text-[#64748b] text-center hover:bg-[#f1f5f9] transition-all cursor-pointer">
+                    Ou cliquez ici pour sélectionner un fichier depuis votre PC
+                  </div>
+                </div>
+              </div>
               {formData.logo && (
-                <div className="w-12 h-12 border border-[#e2e8f0] rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center">
+                <div className="w-16 h-16 border border-[#e2e8f0] shrink-0 rounded-lg overflow-hidden bg-white flex items-center justify-center p-1 shadow-sm">
                   <img src={formData.logo} alt="Preview" className="max-w-full max-h-full object-contain" referrerPolicy="no-referrer" />
                 </div>
               )}
             </div>
-            <p className="text-[10px] text-[#64748b]">Utilisez l'URL de l'image téléchargée ou une URL externe.</p>
+            <p className="text-[10px] text-[#64748b] pt-1">
+              Pour que le logo marche toujours (même sur le bureau), optez pour la sélection d'un fichier.
+            </p>
           </div>
+
         </div>
 
         <div className="pt-4">
