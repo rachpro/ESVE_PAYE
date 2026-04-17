@@ -1,0 +1,57 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user with role-based access",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "displayName": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Employee record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "firstName": { "type": "string" },
+        "lastName": { "type": "string" },
+        "position": { "type": "string" },
+        "baseSalary": { "type": "number" },
+        "socialSecurityNumber": { "type": "string" }
+      },
+      "required": ["id", "firstName", "lastName"]
+    },
+    "PayrollSlip": {
+      "title": "Payroll Slip",
+      "description": "Generated payroll slip record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "period": { "type": "string" },
+        "netPay": { "type": "number" },
+        "data": { "type": "object" }
+      },
+      "required": ["id", "employeeId", "period", "netPay"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and roles"
+    },
+    "/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Employee database"
+    },
+    "/payrollSlips/{slipId}": {
+      "schema": "PayrollSlip",
+      "description": "History of generated slips"
+    }
+  }
+}
