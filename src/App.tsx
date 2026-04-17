@@ -27,12 +27,24 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [company, setCompany] = useState<Company>(DEFAULT_COMPANY);
-  const [history, setHistory] = useState<PayrollSlipData[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>(() => {
+    const saved = localStorage.getItem('employees_data');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [company, setCompany] = useState<Company>(() => {
+    const saved = localStorage.getItem('company_info');
+    return saved ? JSON.parse(saved) : DEFAULT_COMPANY;
+  });
+  const [history, setHistory] = useState<PayrollSlipData[]>(() => {
+    const saved = localStorage.getItem('payroll_history');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [currentSlip, setCurrentSlip] = useState<PayrollSlipData | null>(null);
   const [currentDecharge, setCurrentDecharge] = useState<Decharge | null>(null);
-  const [dechargeHistory, setDechargeHistory] = useState<Decharge[]>([]);
+  const [dechargeHistory, setDechargeHistory] = useState<Decharge[]>(() => {
+    const saved = localStorage.getItem('decharge_history');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   useEffect(() => {
     localStorage.setItem('employees_data', JSON.stringify(employees));
