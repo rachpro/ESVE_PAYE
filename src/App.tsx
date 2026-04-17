@@ -12,6 +12,7 @@ import { Settings } from './components/Settings';
 import { EmployeeManagement } from './components/EmployeeManagement';
 import { DechargeForm } from './components/DechargeForm';
 import { DechargeDocument } from './components/DechargeDocument';
+import { LoginPage } from './components/LoginPage';
 import { Employee, PayrollSlipData, Company, Decharge } from './types';
 import { DEFAULT_COMPANY } from './lib/calculations';
 import { motion, AnimatePresence } from 'motion/react';
@@ -61,7 +62,7 @@ export default function App() {
           await setDoc(doc(db, 'users', currentUser.uid), {
             uid: currentUser.uid,
             email: currentUser.email,
-            displayName: currentUser.displayName,
+            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Utilisateur',
             role: role
           });
         }
@@ -130,33 +131,12 @@ export default function App() {
 
   if (!user || !isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] p-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-xl border border-[#e2e8f0] text-center">
-          <h1 className="text-3xl font-black text-[#2563eb] mb-2">ESVE</h1>
-          <p className="text-[#64748b] mb-8">Accès réservé aux hauts responsables.</p>
-          {!user ? (
-            <button
-              onClick={handleLogin}
-              className="w-full bg-[#2563eb] text-white py-4 rounded-xl font-bold hover:opacity-90 transition-all flex items-center justify-center gap-3 shadow-lg shadow-blue-200"
-            >
-              {company.logo && (
-                <img src={company.logo} alt="ESVE Logo" className="h-6 w-auto object-contain brightness-0 invert" referrerPolicy="no-referrer" />
-              )}
-              <span>Accéder à {company.name}</span>
-            </button>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-red-500 text-sm font-medium">Désolé, vous n'avez pas les droits d'accès.</p>
-              <button
-                onClick={handleLogout}
-                className="text-[#64748b] hover:text-[#1e293b] text-sm font-medium underline"
-              >
-                Se déconnecter
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <LoginPage 
+        company={company}
+        onLogin={handleLogin}
+        error={user && !isAdmin ? "Désolé, votre compte n'a pas les droits d'administration pour accéder à ESVE." : null}
+        onLogout={user && !isAdmin ? handleLogout : undefined}
+      />
     );
   }
 
