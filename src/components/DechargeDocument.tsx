@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'motion/react';
 import SignatureCanvas from 'react-signature-canvas';
+import { DEFAULT_COMPANY } from '../lib/calculations';
 
 interface DechargeDocumentProps {
   data: Decharge;
@@ -254,7 +255,7 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
         </div>
 
         <div className="mt-auto pt-16 text-center text-[10px] text-[#9ca3af] border-t border-[#f3f4f6] no-print">
-          Généré par ESVE
+          Généré par {DEFAULT_COMPANY.name}
         </div>
       </div>
 

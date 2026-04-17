@@ -17,7 +17,7 @@ import { Employee, PayrollSlipData, Company, Decharge } from './types';
 import { DEFAULT_COMPANY } from './lib/calculations';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, googleProvider, db } from './firebase';
-import { signInWithRedirect, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const MOCK_EMPLOYEES: Employee[] = []; // Resetting data as requested
@@ -49,22 +49,32 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         let role = 'user';
         
-        if (userDoc.exists()) {
-          role = userDoc.data().role;
-        } else {
-          // Auto-admin for the owner email
-          if (currentUser.email === 'konerachid12@gmail.com') {
-            role = 'admin';
+        // Super Utilisateurs définis en dur (Le créateur et le patron)
+        const superUsers = ['konerachid12@gmail.com', 'direction@svequipement.com'];
+        if (currentUser.email && superUsers.includes(currentUser.email)) {
+          role = 'admin';
+        }
+
+        try {
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDoc.exists()) {
+            // S'il existe dans la BDD, on met à jour son rôle (sauf si c'est un super user qui force le role admin)
+            if (role !== 'admin') {
+               role = userDoc.data().role;
+            }
+          } else {
+            // Création automatique du document dans Firestore
+            await setDoc(doc(db, 'users', currentUser.uid), {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Utilisateur',
+              role: role
+            });
           }
-          await setDoc(doc(db, 'users', currentUser.uid), {
-            uid: currentUser.uid,
-            email: currentUser.email,
-            displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Utilisateur',
-            role: role
-          });
+        } catch (error) {
+          console.error("Erreur avec Firestore (Règles de sécurité probables), connexion basique accordée", error);
         }
         
         setUser(currentUser);
@@ -80,8 +90,7 @@ export default function App() {
 
   const handleLogin = async () => {
     try {
-      // Pour contourner le blocage des popups dans l'iframe AI Studio, on utilise la redirection
-      await signInWithRedirect(auth, googleProvider);
+      await signInWithPopup(auth, googleProvider);
     } catch (error) {
       console.error("Login failed", error);
     }
@@ -135,7 +144,7 @@ export default function App() {
       <LoginPage 
         company={company}
         onLogin={handleLogin}
-        error={user && !isAdmin ? "Désolé, votre compte n'a pas les droits d'administration pour accéder à ESVE." : null}
+        error={user && !isAdmin ? `Désolé, votre compte n'a pas les droits d'administration pour accéder à ${company.name}.` : null}
         onLogout={user && !isAdmin ? handleLogout : undefined}
       />
     );

@@ -201,7 +201,7 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data }) => {
         </div>
 
         <div className="mt-8 pt-6 border-t border-[#f1f5f9] text-center text-[8px] text-[#94a3b8] no-print">
-          Généré par ESVE
+          Généré par {data.company.name}
         </div>
       </div>
 
