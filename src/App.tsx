@@ -17,7 +17,7 @@ import { Employee, PayrollSlipData, Company, Decharge } from './types';
 import { DEFAULT_COMPANY } from './lib/calculations';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, googleProvider, db } from './firebase';
-import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const MOCK_EMPLOYEES: Employee[] = []; // Resetting data as requested
@@ -96,6 +96,14 @@ export default function App() {
     }
   };
 
+  const handleEmailLogin = async (email: string, pass: string) => {
+    await signInWithEmailAndPassword(auth, email, pass);
+  };
+
+  const handleEmailRegister = async (email: string, pass: string) => {
+    await createUserWithEmailAndPassword(auth, email, pass);
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     setActiveTab('dashboard');
@@ -144,6 +152,8 @@ export default function App() {
       <LoginPage 
         company={company}
         onLogin={handleLogin}
+        onEmailLogin={handleEmailLogin}
+        onEmailRegister={handleEmailRegister}
         error={user && !isAdmin ? `Désolé, votre compte n'a pas les droits d'administration pour accéder à ${company.name}.` : null}
         onLogout={user && !isAdmin ? handleLogout : undefined}
       />
