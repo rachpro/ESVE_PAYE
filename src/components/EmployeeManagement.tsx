@@ -24,9 +24,14 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
     cnib: '',
     position: '',
     baseSalary: 0,
+    matricule: '',
+    hireDate: '',
+    category: '',
+    seniority: '',
+    paymentMode: 'Virement bancaire'
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (errors[name]) {
       setErrors(prev => {
@@ -35,7 +40,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
         return newErrors;
       });
     }
-    setFormData(prev => ({ ...prev, [name]: name === 'baseSalary' ? (value === '' ? undefined : Number(value)) : value }));
+    setFormData(prev => ({ ...prev, [name]: name === 'baseSalary' ? (value === '' ? 0 : Number(value)) : value }));
   };
 
   const validate = () => {
@@ -44,7 +49,6 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
     if (!formData.lastName?.trim()) newErrors.lastName = 'Le nom est obligatoire';
     if (!formData.position?.trim()) newErrors.position = 'Le poste est obligatoire';
     if (!formData.baseSalary || formData.baseSalary <= 0) newErrors.baseSalary = 'Le salaire doit être supérieur à 0';
-    if (!formData.cnib?.trim()) newErrors.cnib = 'Le numéro CNIB est obligatoire';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -70,6 +74,11 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
       cnib: '',
       position: '',
       baseSalary: 0,
+      matricule: '',
+      hireDate: '',
+      category: '',
+      seniority: '',
+      paymentMode: 'Virement bancaire'
     });
     setErrors({});
   };
@@ -196,34 +205,63 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
               <input 
                 type="number" 
                 name="baseSalary" 
-                value={formData.baseSalary} 
+                value={formData.baseSalary ?? 0} 
                 onChange={handleChange} 
                 className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.baseSalary ? 'border-red-500 bg-red-50' : 'border-[#e2e8f0]'}`}
               />
               {errors.baseSalary && <p className="text-[11px] text-red-500 font-medium italic">{errors.baseSalary}</p>}
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">N° Sécurité Sociale (Optionnel)</label>
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">N° Matricule</label>
+              <input type="text" name="matricule" value={formData.matricule || ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" placeholder="EMP-202X-XXX" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Date d'embauche</label>
+              <input type="date" name="hireDate" value={formData.hireDate || ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Catégorie / Échelon</label>
+              <input type="text" name="category" value={formData.category || ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" placeholder="Catégorie V - Échelon 2" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Ancienneté (Optionnel)</label>
+              <input type="text" name="seniority" value={formData.seniority || ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" placeholder="X ans" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">N° Sécurité Sociale (N° CNSS)</label>
               <input type="text" name="socialSecurityNumber" value={formData.socialSecurityNumber || ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">N° CNIB <span className="text-red-500">*</span></label>
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Mode de paiement</label>
+              <select 
+                name="paymentMode" 
+                value={formData.paymentMode} 
+                onChange={handleChange}
+                className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm bg-white"
+              >
+                <option value="Virement bancaire">Virement bancaire</option>
+                <option value="Espèces">Espèces</option>
+                <option value="Chèque">Chèque</option>
+                <option value="Mobile Money">Mobile Money</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">N° CNIB</label>
               <input 
                 type="text" 
                 name="cnib" 
-                value={formData.cnib} 
+                value={formData.cnib || ''} 
                 onChange={handleChange} 
-                className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.cnib ? 'border-red-500 bg-red-50' : 'border-[#e2e8f0]'}`}
+                className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm transition-all"
               />
-              {errors.cnib && <p className="text-[11px] text-red-500 font-medium italic">{errors.cnib}</p>}
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Adresse</label>
-              <input type="text" name="address" value={formData.address} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
+              <input type="text" name="address" value={formData.address ?? ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
             </div>
             <div className="space-y-2 md:col-span-2">
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Résidence</label>
-              <input type="text" name="residence" value={formData.residence} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
+              <input type="text" name="residence" value={formData.residence ?? ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
             </div>
             <div className="md:col-span-2 pt-4">
               <button type="submit" className="w-full bg-[#2563eb] text-white py-3 rounded-lg font-bold text-sm shadow-sm hover:opacity-90 transition-all flex items-center justify-center gap-2">

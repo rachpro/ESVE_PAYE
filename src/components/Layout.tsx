@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, FileText, Settings, PlusCircle, LogOut, AlertTriangle, X } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Settings, PlusCircle, LogOut, AlertTriangle, X, Trash2 } from 'lucide-react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { Company } from '../types';
@@ -21,6 +21,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
     { id: 'generate', label: 'Bulletins de paie', icon: PlusCircle },
     { id: 'decharge', label: 'Décharge', icon: FileText },
     { id: 'history', label: 'Historique', icon: FileText },
+    { id: 'corbeille', label: 'Corbeille', icon: Trash2 },
     { id: 'settings', label: 'Paramètres', icon: Settings },
   ];
 
@@ -74,9 +75,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         <div className="p-8 pb-4 flex flex-col items-center text-center">
           <div className="mb-4">
             {company.logo ? (
-              <img src={company.logo} alt="Logo" className="h-20 w-auto object-contain" referrerPolicy="no-referrer" />
+              <img 
+                src={company.logo} 
+                alt="Logo" 
+                className="h-20 w-auto object-contain" 
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.onerror = null; // Prevent infinite loop
+                  e.currentTarget.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(company.name) + '&background=2563eb&color=fff&size=128&rounded=true&bold=true';
+                }}
+              />
             ) : (
-              <div className="w-16 h-16 bg-[#2563eb] rounded-2xl flex items-center justify-center text-white text-3xl font-black">E</div>
+              <div className="w-16 h-16 bg-[#2563eb] rounded-2xl flex items-center justify-center text-white text-3xl font-black">
+                {company.name ? company.name.charAt(0).toUpperCase() : 'E'}
+              </div>
             )}
           </div>
           <div className="space-y-1">

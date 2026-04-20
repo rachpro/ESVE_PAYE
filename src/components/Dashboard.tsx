@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Users, FileText, CreditCard, ReceiptText } from 'lucide-react';
+import { TrendingUp, Users, FileText, CreditCard, ReceiptText, Eye, Trash2 } from 'lucide-react';
 import { PayrollSlipData, Decharge } from '../types';
 
 interface DashboardProps {
@@ -7,13 +7,19 @@ interface DashboardProps {
   dechargeHistory: Decharge[];
   onViewSlip: (slip: PayrollSlipData) => void;
   onViewDecharge: (decharge: Decharge) => void;
+  onDeleteSlip?: (id: string) => void;
+  onDeleteDecharge?: (id: string) => void;
+  onReset?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
   history = [], 
   dechargeHistory = [], 
   onViewSlip, 
-  onViewDecharge 
+  onViewDecharge,
+  onDeleteSlip,
+  onDeleteDecharge,
+  onReset
 }) => {
   const totalNet = history.reduce((acc, slip) => acc + (slip?.netPay || 0), 0);
   const totalGross = history.reduce((acc, slip) => acc + (slip?.grossSalary || 0), 0);
@@ -62,18 +68,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  history.slice(0, 10).map((slip) => (
+                  history.slice(0, 10).map((slip, idx) => (
                     <tr 
-                      key={slip.id} 
-                      onClick={() => onViewSlip(slip)}
-                      className="hover:bg-blue-50/50 transition-colors cursor-pointer text-sm group"
+                      key={slip.id || `slip-${idx}`} 
+                      className="hover:bg-blue-50/50 transition-colors text-sm group"
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 cursor-pointer" onClick={() => onViewSlip(slip)}>
                         <div className="font-bold text-[#1e293b]">{slip.employee.firstName} {slip.employee.lastName}</div>
                         <div className="text-[10px] text-[#64748b]">{slip.employee.position}</div>
                       </td>
-                      <td className="px-6 py-4 text-[#64748b] font-medium">{slip.period}</td>
-                      <td className="px-6 py-4 font-black text-[#1e293b]">{slip.netPay.toLocaleString('fr-FR')}</td>
+                      <td className="px-6 py-4 text-[#64748b] font-medium cursor-pointer" onClick={() => onViewSlip(slip)}>{slip.period}</td>
+                      <td className="px-6 py-4 font-black text-[#1e293b]">
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="cursor-pointer" onClick={() => onViewSlip(slip)}>{slip.netPay.toLocaleString('fr-FR')}</span>
+                          {onDeleteSlip && (
+                            <button
+                              title="Déplacer vers la corbeille"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm("Envoyer ce bulletin à la corbeille ?")) {
+                                  onDeleteSlip(slip.id || '');
+                                }
+                              }}
+                              className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded transition-all"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -107,18 +130,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  dechargeHistory.slice(0, 10).map((dec) => (
+                  dechargeHistory.slice(0, 10).map((dec, idx) => (
                     <tr 
-                      key={dec.id} 
-                      onClick={() => onViewDecharge(dec)}
-                      className="hover:bg-blue-50/50 transition-colors cursor-pointer text-sm group"
+                      key={dec.id || `dec-${idx}`} 
+                      className="hover:bg-blue-50/50 transition-colors text-sm group"
                     >
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 cursor-pointer" onClick={() => onViewDecharge(dec)}>
                         <div className="font-bold text-[#1e293b]">{dec.beneficiaryName}</div>
                         <div className="text-[10px] text-[#64748b] truncate max-w-[150px]">{dec.purpose}</div>
                       </td>
-                      <td className="px-6 py-4 text-[#64748b] font-medium">{new Date(dec.date).toLocaleDateString('fr-FR')}</td>
-                      <td className="px-6 py-4 font-black text-[#1e293b]">{dec.amount.toLocaleString('fr-FR')}</td>
+                      <td className="px-6 py-4 text-[#64748b] font-medium cursor-pointer" onClick={() => onViewDecharge(dec)}>{new Date(dec.date).toLocaleDateString('fr-FR')}</td>
+                      <td className="px-6 py-4 font-black text-[#1e293b]">
+                        <div className="flex justify-between items-center gap-4">
+                          <span className="cursor-pointer" onClick={() => onViewDecharge(dec)}>{dec.amount.toLocaleString('fr-FR')}</span>
+                          {onDeleteDecharge && (
+                            <button
+                              title="Déplacer vers la corbeille"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm("Envoyer cette décharge à la corbeille ?")) {
+                                  onDeleteDecharge(dec.id || '');
+                                }
+                              }}
+                              className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded transition-all"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -127,6 +167,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {onReset && (
+        <div className="pt-10 flex justify-center">
+          <button
+            onClick={onReset}
+            className="flex items-center gap-2 px-4 py-2 border border-red-100 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg text-xs font-semibold transition-all"
+          >
+            <Trash2 size={14} />
+            Réinitialiser toutes les données locales
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -32,19 +32,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({ company, onLogin, onEmailL
         await onEmailLogin(email, password, rememberMe);
       }
     } catch (err: any) {
-      let errorMessage = err.message || 'Une erreur est survenue.';
-      const firebaseError = err.code || errorMessage;
-      if (firebaseError.includes('auth/invalid-credential') || firebaseError.includes('auth/wrong-password')) {
-        errorMessage = 'Email ou mot de passe incorrect.';
-      } else if (firebaseError.includes('auth/user-not-found')) {
-        errorMessage = 'Aucun compte trouvé avec cet email.';
-      } else if (firebaseError.includes('auth/email-already-in-use')) {
-        errorMessage = 'Cet email est déjà utilisé. Veuillez vous connecter.';
-      } else if (firebaseError.includes('auth/weak-password')) {
-        errorMessage = 'Le mot de passe doit faire au moins 6 caractères.';
-      } else if (firebaseError.includes('auth/operation-not-allowed')) {
-        errorMessage = "La connexion par Email n'est pas activée. Demandez à l'administrateur de l'activer dans la console Firebase.";
+      let errorMessage = 'Une erreur inattendue est survenue. Veuillez réessayer.';
+      const errorCode = err.code || '';
+      const rawMessage = err.message || '';
+
+      // Detailed and user-friendly error mapping
+      if (errorCode === 'auth/invalid-credential' || errorCode === 'auth/wrong-password') {
+        errorMessage = 'Les informations de connexion sont incorrectes. Vérifiez votre email et mot de passe.';
+      } else if (errorCode === 'auth/user-not-found') {
+        errorMessage = "Aucun compte n'est associé à cette adresse email. Souhaitez-vous en créer un ?";
+      } else if (errorCode === 'auth/email-already-in-use') {
+        errorMessage = 'Cette adresse email est déjà utilisée par un autre compte. Essayez de vous connecter.';
+      } else if (errorCode === 'auth/invalid-email') {
+        errorMessage = "Le format de l'adresse email n'est pas valide.";
+      } else if (errorCode === 'auth/weak-password') {
+        errorMessage = 'Le mot de passe choisi est trop simple. Utilisez au moins 6 caractères.';
+      } else if (errorCode === 'auth/user-disabled') {
+        errorMessage = 'Ce compte a été désactivé. Veuillez contacter le support.';
+      } else if (errorCode === 'auth/operation-not-allowed') {
+        errorMessage = "La connexion par email/mot de passe n'est pas activée pour ce projet.";
+      } else if (errorCode === 'auth/too-many-requests') {
+        errorMessage = "Trop de tentatives infructueuses. Votre compte a été temporairement bloqué par sécurité. Réessayez plus tard.";
+      } else if (errorCode === 'auth/network-request-failed') {
+        errorMessage = "Erreur réseau. Vérifiez votre connexion internet.";
+      } else if (rawMessage.includes('auth/')) {
+        // Fallback for codes contained in the message string
+        if (rawMessage.includes('invalid-credential')) errorMessage = 'Email ou mot de passe incorrect.';
+        else if (rawMessage.includes('user-not-found')) errorMessage = 'Utilisateur non trouvé.';
       }
+      
       setLocalError(errorMessage);
     } finally {
       setIsLoading(false);

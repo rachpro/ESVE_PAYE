@@ -62,12 +62,46 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
-        allowTaint: false,
+        allowTaint: true,
         backgroundColor: '#ffffff',
-        logging: true,
-        scrollY: -window.scrollY,
-        windowHeight: element.scrollHeight,
-        height: element.scrollHeight,
+        onclone: (clonedDoc) => {
+          // Forcefully remove modern CSS color functions from all style tags in the clone
+          const styleTags = clonedDoc.getElementsByTagName('style');
+          for (let i = 0; i < styleTags.length; i++) {
+            // Aggressive replacement for any oklab/oklch strings
+            styleTags[i].innerHTML = styleTags[i].innerHTML.replace(/okl(ab|ch)\s*\([^)]+\)/gi, '#000000');
+            // Also replace any variables that might be holding these colors
+            styleTags[i].innerHTML = styleTags[i].innerHTML.replace(/--[\w-]+\s*:\s*okl(ab|ch)\s*\([^)]+\)/gi, '--fixed: #000000');
+          }
+
+          const elements = clonedDoc.querySelectorAll('*');
+          elements.forEach(el => {
+            const node = el as HTMLElement;
+            try {
+              const style = window.getComputedStyle(node);
+              const propsToFix = [
+                'color', 'backgroundColor', 'borderColor', 'outlineColor', 
+                'fill', 'stroke', 'boxShadow', 'textShadow', 'borderTopColor', 
+                'borderBottomColor', 'borderLeftColor', 'borderRightColor'
+              ];
+              
+              propsToFix.forEach(prop => {
+                const val = style.getPropertyValue(prop);
+                if (val && (val.includes('okl') || val.includes('var('))) {
+                  // Apply standard fallback with !important to ensure override
+                  let fallback = '#1e293b'; 
+                  if (prop.toLowerCase().includes('background')) fallback = '#ffffff';
+                  if (val.includes('blue') || val.includes('2563eb')) fallback = '#2563eb';
+                  if (val.includes('slate') || val.includes('64748b')) fallback = '#64748b';
+                  
+                  node.style.setProperty(prop, fallback, 'important');
+                }
+              });
+            } catch (e) {
+              // ignore
+            }
+          });
+        }
       });
       
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -251,13 +285,20 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
             En foi de quoi, la présente décharge est établie pour servir et valoir ce que de droit.
           </p>
 
-          <div className="flex justify-end mt-16">
-            <div className="text-right space-y-8">
-              <p>Fait à : <span className="font-bold px-2">{data.location}</span> Le : <span className="font-bold px-2">{data.date}</span></p>
-              
-              <div className="pt-8">
-                <p className="font-bold mb-4">Signature du bénéficiaire :</p>
-                <div className="h-32 w-64 border border-dashed border-[#d1d5db] mt-4 ml-auto flex items-center justify-center relative overflow-hidden bg-[#f9fafb]">
+          <div className="mt-16 space-y-8">
+            <p className="text-right">Fait à : <span className="font-bold px-2">{data.location}</span> Le : <span className="font-bold px-2">{data.date}</span></p>
+            
+            <div className="flex justify-between items-start">
+              <div className="space-y-4">
+                <p className="font-bold underline">Pour ESVE (Cachet & Signature) :</p>
+                <div className="h-32 w-64 border border-dashed border-[#d1d5db] bg-[#f9fafb] flex items-center justify-center">
+                  <span className="text-[10px] text-[#94a3b8] no-print italic">Réservé à l'administration</span>
+                </div>
+              </div>
+
+              <div className="text-right space-y-4">
+                <p className="font-bold underline">Signature du bénéficiaire :</p>
+                <div className="h-32 w-64 border border-dashed border-[#d1d5db] ml-auto flex items-center justify-center relative overflow-hidden bg-[#f9fafb]">
                   {data.signature ? (
                     <img src={data.signature} alt="Signature" className="max-h-full max-w-full object-contain" />
                   ) : (
@@ -329,12 +370,22 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
               <p>La somme de : <span className="font-bold">{data.amount.toLocaleString()} FCFA ({data.amountInWords})</span></p>
               <p>Au titre de : <span className="font-bold">{data.purpose}</span></p>
               <p>Date du paiement : <span className="font-bold">{data.paymentDate}</span></p>
-              <div className="flex justify-end mt-16 text-right">
-                <div className="w-1/2">
-                  <p>Fait à : <span className="font-bold">{data.location}</span> Le : <span className="font-bold">{data.date}</span></p>
-                  <p className="mt-8 font-bold underline">Signature :</p>
-                  <div className="h-24 w-full border border-dashed border-[#e2e8f0] mt-2 ml-auto flex items-center justify-center">
-                    {data.signature && <img src={data.signature} alt="Signature Preview" className="max-h-full max-w-full object-contain" />}
+              <div className="mt-16 space-y-8">
+                <p className="text-right">Fait à : <span className="font-bold">{data.location}</span> Le : <span className="font-bold">{data.date}</span></p>
+                
+                <div className="flex justify-between items-start">
+                  <div className="space-y-4">
+                    <p className="font-bold underline">Pour ESVE (Cachet & Signature) :</p>
+                    <div className="h-32 w-64 border border-dashed border-[#d1d5db] bg-[#f9fafb] flex items-center justify-center">
+                      <span className="text-[10px] text-[#94a3b8] no-print italic uppercase">Réservé à ESVE</span>
+                    </div>
+                  </div>
+
+                  <div className="text-right space-y-4">
+                    <p className="font-bold underline">Signature du bénéficiaire :</p>
+                    <div className="h-32 w-64 border border-dashed border-[#d1d5db] ml-auto flex items-center justify-center relative overflow-hidden bg-[#f9fafb]">
+                      {data.signature && <img src={data.signature} alt="Signature Preview" className="max-h-full max-w-full object-contain" />}
+                    </div>
                   </div>
                 </div>
               </div>

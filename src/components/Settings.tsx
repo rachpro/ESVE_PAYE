@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Company } from '../types';
-import { Building2, MapPin, Hash, Briefcase, Image as ImageIcon, Save, Phone, Mail, FileText, ShieldCheck, Activity, Layers, CreditCard } from 'lucide-react';
+import { Building2, MapPin, Hash, Briefcase, Image as ImageIcon, Save, Phone, Mail, FileText, ShieldCheck, Activity, Layers, CreditCard, Trash2 } from 'lucide-react';
 
 interface SettingsProps {
   company: Company;
   onSave: (company: Company) => void;
+  onReset?: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ company, onSave }) => {
+export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) => {
   const [formData, setFormData] = useState<Company>(company);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,34 +135,34 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave }) => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#64748b] flex items-center gap-2">
-                <Hash size={14} />
-                SIRET (Optionnel)
-              </label>
-              <input
-                type="text"
-                name="siret"
-                value={formData.siret}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#64748b] flex items-center gap-2">
+                  <Hash size={14} />
+                  SIRET (Optionnel)
+                </label>
+                <input
+                  type="text"
+                  name="siret"
+                  value={formData.siret || ''}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-[#64748b] flex items-center gap-2">
+                  <Briefcase size={14} />
+                  Code APE (Optionnel)
+                </label>
+                <input
+                  type="text"
+                  name="ape"
+                  value={formData.ape || ''}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#64748b] flex items-center gap-2">
-                <Briefcase size={14} />
-                Code APE (Optionnel)
-              </label>
-              <input
-                type="text"
-                name="ape"
-                value={formData.ape}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
-              />
-            </div>
-          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -251,6 +252,25 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave }) => {
           </button>
         </div>
       </form>
+
+      {onReset && (
+        <div className="mt-12 p-8 border-t border-red-100 bg-red-50/30">
+          <h4 className="text-sm font-bold text-red-600 flex items-center gap-2 mb-2 uppercase tracking-wider">
+            <Trash2 size={16} />
+            Zone de danger
+          </h4>
+          <p className="text-xs text-red-500 mb-4">
+            La réinitialisation supprimera définitivement tous vos employés, bulletins de paie, décharges et paramètres. 
+            Cette action ne peut pas être annulée.
+          </p>
+          <button
+            onClick={onReset}
+            className="px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg text-xs font-bold hover:bg-red-50 transition-all shadow-sm flex items-center gap-2"
+          >
+            Réinitialiser toutes les données de l'application
+          </button>
+        </div>
+      )}
     </div>
   );
 };

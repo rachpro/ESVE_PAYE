@@ -13,6 +13,7 @@ import { EmployeeManagement } from './components/EmployeeManagement';
 import { DechargeForm } from './components/DechargeForm';
 import { DechargeDocument } from './components/DechargeDocument';
 import { LoginPage } from './components/LoginPage';
+import { TrashBin } from './components/TrashBin';
 import { Employee, PayrollSlipData, Company, Decharge } from './types';
 import { DEFAULT_COMPANY } from './lib/calculations';
 import { motion, AnimatePresence } from 'motion/react';
@@ -33,16 +34,45 @@ export default function App() {
   });
   const [company, setCompany] = useState<Company>(() => {
     const saved = localStorage.getItem('company_info');
-    return saved ? JSON.parse(saved) : DEFAULT_COMPANY;
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Patch old broken logo if it was cached
+      if (parsed.logo === '/logo.png.jpg') {
+        parsed.logo = '';
+      }
+      return parsed;
+    }
+    return DEFAULT_COMPANY;
   });
   const [history, setHistory] = useState<PayrollSlipData[]>(() => {
     const saved = localStorage.getItem('payroll_history');
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    const parsed = JSON.parse(saved);
+    // Migration: Ensure all old slips have IDs
+    return parsed.map((s: any) => ({
+      ...s,
+      id: s.id || Math.random().toString(36).substr(2, 9)
+    }));
   });
   const [currentSlip, setCurrentSlip] = useState<PayrollSlipData | null>(null);
   const [currentDecharge, setCurrentDecharge] = useState<Decharge | null>(null);
   const [dechargeHistory, setDechargeHistory] = useState<Decharge[]>(() => {
     const saved = localStorage.getItem('decharge_history');
+    if (!saved) return [];
+    const parsed = JSON.parse(saved);
+    // Migration: Ensure all old decharges have IDs
+    return parsed.map((d: any) => ({
+      ...d,
+      id: d.id || Date.now().toString() + Math.random().toString(36).substr(2, 5)
+    }));
+  });
+  
+  const [trashedHistory, setTrashedHistory] = useState<PayrollSlipData[]>(() => {
+    const saved = localStorage.getItem('trashed_history');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [trashedDecharges, setTrashedDecharges] = useState<Decharge[]>(() => {
+    const saved = localStorage.getItem('trashed_decharges');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -51,12 +81,24 @@ export default function App() {
   }, [employees]);
 
   useEffect(() => {
+    localStorage.setItem('company_info', JSON.stringify(company));
+  }, [company]);
+
+  useEffect(() => {
     localStorage.setItem('payroll_history', JSON.stringify(history));
   }, [history]);
 
   useEffect(() => {
     localStorage.setItem('decharge_history', JSON.stringify(dechargeHistory));
   }, [dechargeHistory]);
+  
+  useEffect(() => {
+    localStorage.setItem('trashed_history', JSON.stringify(trashedHistory));
+  }, [trashedHistory]);
+  
+  useEffect(() => {
+    localStorage.setItem('trashed_decharges', JSON.stringify(trashedDecharges));
+  }, [trashedDecharges]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -127,13 +169,13 @@ export default function App() {
   };
 
   const handleGenerate = (slip: PayrollSlipData) => {
-    setHistory([slip, ...history]);
+    setHistory(prev => [slip, ...prev]);
     setCurrentSlip(slip);
     setActiveTab('preview');
   };
 
   const handleGenerateDecharge = (decharge: Decharge) => {
-    setDechargeHistory([decharge, ...dechargeHistory]);
+    setDechargeHistory(prev => [decharge, ...prev]);
     setCurrentDecharge(decharge);
     setActiveTab('decharge-preview');
   };
@@ -192,6 +234,85 @@ export default function App() {
     setCurrentDecharge(updated);
   };
 
+  const handleDeleteSlip = (id: string, isPermanent = false) => {
+    if (!id) {
+      console.warn("Tentative de suppression d'un bulletin sans ID");
+      return;
+    }
+    
+    if (isPermanent) {
+      setTrashedHistory(prev => prev.filter(s => s.id !== id));
+    } else {
+      // Use functional update to ensure we have the latest history
+      setHistory(currentHistory => {
+        const slipToTrash = currentHistory.find(s => s.id === id);
+        if (slipToTrash) {
+          setTrashedHistory(prev => [slipToTrash, ...prev]);
+          return currentHistory.filter(s => s.id !== id);
+        }
+        return currentHistory;
+      });
+    }
+  };
+
+  const handleRestoreSlip = (id: string) => {
+    if (!id) return;
+    setTrashedHistory(currentTrashed => {
+      const slip = currentTrashed.find(s => s.id === id);
+      if (slip) {
+        setHistory(prev => [slip, ...prev]);
+        return currentTrashed.filter(s => s.id !== id);
+      }
+      return currentTrashed;
+    });
+  };
+
+  const handleDeleteDecharge = (id: string, isPermanent = false) => {
+    if (!id) {
+      console.warn("Tentative de suppression d'une décharge sans ID");
+      return;
+    }
+    
+    if (isPermanent) {
+      setTrashedDecharges(prev => prev.filter(d => d.id !== id));
+    } else {
+      setDechargeHistory(currentHistory => {
+        const dechargeToTrash = currentHistory.find(d => d.id === id);
+        if (dechargeToTrash) {
+          setTrashedDecharges(prev => [dechargeToTrash, ...prev]);
+          return currentHistory.filter(d => d.id !== id);
+        }
+        return currentHistory;
+      });
+    }
+  };
+
+  const handleRestoreDecharge = (id: string) => {
+    if (!id) return;
+    setTrashedDecharges(currentTrashed => {
+      const decharge = currentTrashed.find(d => d.id === id);
+      if (decharge) {
+        setDechargeHistory(prev => [decharge, ...prev]);
+        return currentTrashed.filter(d => d.id !== id);
+      }
+      return currentTrashed;
+    });
+  };
+
+  const handleResetAllData = () => {
+    if (window.confirm("CETTE ACTION EST IRRÉVERSIBLE. Voulez-vous vraiment supprimer TOUS les bulletins, décharges, employés et informations d'entreprise de votre stockage local ?")) {
+      setEmployees([]);
+      setHistory([]);
+      setDechargeHistory([]);
+      setTrashedHistory([]);
+      setTrashedDecharges([]);
+      setCompany(DEFAULT_COMPANY);
+      localStorage.clear();
+      setActiveTab('dashboard');
+      alert("Toutes les données ont été réinitialisées.");
+    }
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -200,6 +321,9 @@ export default function App() {
           dechargeHistory={dechargeHistory}
           onViewSlip={handleViewSlip} 
           onViewDecharge={handleViewDecharge}
+          onDeleteSlip={(id) => handleDeleteSlip(id, false)}
+          onDeleteDecharge={(id) => handleDeleteDecharge(id, false)}
+          onReset={handleResetAllData}
         />;
       case 'generate':
         return <PayrollForm employees={employees} company={company} onGenerate={handleGenerate} />;
@@ -208,7 +332,7 @@ export default function App() {
       case 'decharge-preview':
         return currentDecharge ? <DechargeDocument data={currentDecharge} onUpdate={handleUpdateDecharge} /> : null;
       case 'settings':
-        return <Settings company={company} onSave={handleSaveCompany} />;
+        return <Settings company={company} onSave={handleSaveCompany} onReset={handleResetAllData} />;
       case 'preview':
         return currentSlip ? (
           <motion.div
@@ -244,6 +368,18 @@ export default function App() {
           dechargeHistory={dechargeHistory}
           onViewSlip={handleViewSlip} 
           onViewDecharge={handleViewDecharge}
+          onDeleteSlip={(id) => handleDeleteSlip(id, false)}
+          onDeleteDecharge={(id) => handleDeleteDecharge(id, false)}
+          onReset={handleResetAllData}
+        />;
+      case 'corbeille':
+        return <TrashBin 
+          trashedHistory={trashedHistory}
+          trashedDecharges={trashedDecharges}
+          onRestoreSlip={handleRestoreSlip}
+          onRestoreDecharge={handleRestoreDecharge}
+          onDeleteSlip={(id) => handleDeleteSlip(id, true)}
+          onDeleteDecharge={(id) => handleDeleteDecharge(id, true)}
         />;
       default:
         return <Dashboard 
@@ -251,6 +387,9 @@ export default function App() {
           dechargeHistory={dechargeHistory}
           onViewSlip={handleViewSlip} 
           onViewDecharge={handleViewDecharge}
+          onDeleteSlip={(id) => handleDeleteSlip(id, false)}
+          onDeleteDecharge={(id) => handleDeleteDecharge(id, false)}
+          onReset={handleResetAllData}
         />;
     }
   };

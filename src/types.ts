@@ -11,6 +11,8 @@ export interface Company {
   ifu?: string;
   regime?: string;
   division?: string;
+  sector?: string;
+  cnssEmployer?: string;
 }
 
 export interface Employee {
@@ -23,6 +25,11 @@ export interface Employee {
   cnib?: string;
   position: string;
   baseSalary: number;
+  matricule?: string;
+  hireDate?: string;
+  category?: string;
+  seniority?: string;
+  paymentMode?: string;
 }
 
 export interface PayrollLine {
@@ -32,6 +39,7 @@ export interface PayrollLine {
   amount: number;
   type: 'earning' | 'deduction' | 'info';
   category?: 'social' | 'tax' | 'other';
+  employerAmount?: number;
 }
 
 export interface Decharge {
@@ -69,4 +77,8 @@ export interface PayrollSlipData {
   incomeTax: number;
   netPay: number;
   totalEmployerCost: number;
+  convention?: string;
+  leaveAcquired?: number;
+  leaveTaken?: number;
+  leaveBalance?: number;
 }

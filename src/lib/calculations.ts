@@ -5,7 +5,7 @@ export const DEFAULT_COMPANY: Company = {
   address: "S/C 04 BP 398 OUAGA 04, Secteur 42 OUAGADOUGOU",
   siret: "N/A",
   ape: "N/A",
-  logo: "/logo.png.jpg",
+  logo: "",
   phone: "(+226) 05 56 25 92",
   email: "direction@svequipement.com",
   rib: "BF148-01001-077355324101-26",
