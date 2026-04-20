@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, FileText, Settings, PlusCircle, LogOut, AlertTriangle, X, Trash2 } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Settings, PlusCircle, LogOut, AlertTriangle, X, Trash2, ShieldCheck } from 'lucide-react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { Company } from '../types';
@@ -72,27 +72,29 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 
       {/* Sidebar */}
       <aside className="w-[260px] bg-white flex flex-col border-r border-[#e2e8f0] h-screen sticky top-0">
-        <div className="p-8 pb-4 flex flex-col items-center text-center">
-          <div className="mb-4">
+        <div className="p-8 pb-6 flex flex-col items-center text-center">
+          <div className="mb-6 w-full flex justify-center">
             {company.logo ? (
-              <img 
-                src={company.logo} 
-                alt="Logo" 
-                className="h-20 w-auto object-contain" 
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  e.currentTarget.onerror = null; // Prevent infinite loop
-                  e.currentTarget.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(company.name) + '&background=2563eb&color=fff&size=128&rounded=true&bold=true';
-                }}
-              />
+              <div className="bg-white p-2 rounded-xl border border-gray-100 shadow-sm">
+                <img 
+                  src={company.logo} 
+                  alt="Logo" 
+                  className="h-24 w-auto object-contain drop-shadow-md" 
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null; // Prevent infinite loop
+                    e.currentTarget.src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(company.name) + '&background=2563eb&color=fff&size=128&rounded=true&bold=true';
+                  }}
+                />
+              </div>
             ) : (
-              <div className="w-16 h-16 bg-[#2563eb] rounded-2xl flex items-center justify-center text-white text-3xl font-black">
-                {company.name ? company.name.charAt(0).toUpperCase() : 'E'}
+              <div className="w-20 h-20 bg-white border-2 border-dashed border-[#cbd5e1] rounded-2xl flex items-center justify-center text-[#2563eb] shadow-sm">
+                <ShieldCheck size={40} />
               </div>
             )}
           </div>
-          <div className="space-y-1">
-            <h1 className="text-sm font-black text-[#1e293b] leading-tight uppercase tracking-wider">
+          <div className="space-y-1 w-full">
+            <h1 className="text-xs font-black text-[#1e293b] leading-tight uppercase tracking-[0.15em] border-b border-blue-100 pb-2 mb-2">
               {company.name}
             </h1>
           </div>

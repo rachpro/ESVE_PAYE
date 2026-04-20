@@ -7,12 +7,27 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface PayrollSlipProps {
   data: PayrollSlipData;
+  autoDownload?: boolean;
+  onComplete?: () => void;
 }
 
-export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data }) => {
+export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, onComplete }) => {
   const slipRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = React.useState(false);
   const [showFullPreview, setShowFullPreview] = React.useState(false);
+
+  React.useEffect(() => {
+    if (autoDownload) {
+      const timer = setTimeout(() => {
+        if (slipRef.current) {
+          handleDownloadPDF().then(() => {
+            if (onComplete) onComplete();
+          });
+        }
+      }, 1000); // Increased safety margin
+      return () => clearTimeout(timer);
+    }
+  }, [autoDownload]);
 
   const handlePrint = () => {
     window.print();
@@ -34,7 +49,7 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data }) => {
         });
       });
       await Promise.all(imagePromises);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       const canvas = await html2canvas(element, {
         scale: 2,
@@ -42,13 +57,19 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data }) => {
         allowTaint: true,
         backgroundColor: '#ffffff',
         onclone: (clonedDoc) => {
-          // Forcefully remove modern CSS color functions from all style tags in the clone
+          // Remove all style/link tags that might contain the problematic CSS or sanitize them
           const styleTags = clonedDoc.getElementsByTagName('style');
           for (let i = 0; i < styleTags.length; i++) {
-            // Aggressive replacement for any oklab/oklch strings
-            styleTags[i].innerHTML = styleTags[i].innerHTML.replace(/okl(ab|ch)\s*\([^)]+\)/gi, '#000000');
-            // Also replace any variables that might be holding these colors
-            styleTags[i].innerHTML = styleTags[i].innerHTML.replace(/--[\w-]+\s*:\s*okl(ab|ch)\s*\([^)]+\)/gi, '--fixed: #000000');
+            try {
+              let cssText = styleTags[i].innerHTML;
+              // Aggressive replacement for any oklab/oklch strings
+              cssText = cssText.replace(/okl(ab|ch)\s*\([^)]+\)/gi, '#000000');
+              // Replace variables that might be holding these colors
+              cssText = cssText.replace(/--[\w-]+\s*:\s*okl(ab|ch)\s*\([^)]+\)/gi, '--fixed-color: #000000');
+              styleTags[i].innerHTML = cssText;
+            } catch (styleErr) {
+              // ignore
+            }
           }
 
           const elements = clonedDoc.querySelectorAll('*');
@@ -56,10 +77,12 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data }) => {
             const node = el as HTMLElement;
             try {
               const style = window.getComputedStyle(node);
+              // List of properties likely to contain colors
               const propsToFix = [
                 'color', 'backgroundColor', 'borderColor', 'outlineColor', 
                 'fill', 'stroke', 'boxShadow', 'textShadow', 'borderTopColor', 
-                'borderBottomColor', 'borderLeftColor', 'borderRightColor'
+                'borderBottomColor', 'borderLeftColor', 'borderRightColor',
+                'border-color', 'background-color'
               ];
               
               propsToFix.forEach(prop => {
@@ -70,6 +93,7 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data }) => {
                   if (prop.toLowerCase().includes('background')) fallback = '#ffffff';
                   if (val.includes('blue') || val.includes('2563eb')) fallback = '#2563eb';
                   if (val.includes('slate') || val.includes('64748b')) fallback = '#64748b';
+                  if (prop === 'boxShadow') fallback = 'none';
                   
                   node.style.setProperty(prop, fallback, 'important');
                 }
@@ -101,10 +125,23 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data }) => {
       
       const xOffset = (pdfWidth - finalWidth) / 2;
       pdf.addImage(imgData, 'JPEG', xOffset, 0, finalWidth, finalHeight);
-      pdf.save(`bulletin_paie_${(data.employee.lastName || 'doc').replace(/\s+/g, '_')}_${(data.period || 'period').replace(/\s+/g, '_')}.pdf`);
+      
+      try {
+        pdf.save(`bulletin_paie_${(data.employee.lastName || 'doc').replace(/\s+/g, '_')}_${(data.period || 'period').replace(/\s+/g, '_')}.pdf`);
+      } catch (saveError) {
+        console.warn("pdf.save() failed, trying blob URL fallback:", saveError);
+        const blob = pdf.output('blob');
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `bulletin_paie_${(data.employee.lastName || 'doc').replace(/\s+/g, '_')}_${(data.period || 'period').replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     } catch (error) {
-      console.error("Erreur PDF:", error);
-      alert("Erreur de génération. Utilisez le bouton 'Imprimer' à la place.");
+      console.error("Erreur détaillée PDF:", error);
+      alert("Le téléchargement direct a échoué. \n\nSOLUTION : Utilisez le bouton 'Imprimer' et sélectionnez 'Enregistrer au format PDF'.");
     } finally {
       setIsDownloading(false);
     }
@@ -162,6 +199,10 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data }) => {
           <div className="grid grid-cols-2 divide-x divide-[#e2e8f0]">
             <div className="p-2 bg-[#fafafa] font-bold">Ancienneté</div>
             <div className="p-2">{data.employee.seniority || '-'}</div>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-[#e2e8f0] border-t border-[#e2e8f0]">
+            <div className="p-2 bg-[#fafafa] font-bold">Type de contrat</div>
+            <div className="p-2 font-bold text-[#2563eb]">{data.contractType || '-'}</div>
           </div>
           <div className="grid grid-cols-2 divide-x divide-[#e2e8f0] border-t border-[#e2e8f0]">
             <div className="p-2 bg-[#fafafa] font-bold">N° CNSS salarié</div>

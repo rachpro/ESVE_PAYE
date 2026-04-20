@@ -10,14 +10,29 @@ import { DEFAULT_COMPANY } from '../lib/calculations';
 interface DechargeDocumentProps {
   data: Decharge;
   onUpdate?: (updated: Decharge) => void;
+  autoDownload?: boolean;
+  onComplete?: () => void;
 }
 
-export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpdate }) => {
+export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpdate, autoDownload, onComplete }) => {
   const docRef = useRef<HTMLDivElement>(null);
   const signaturePad = useRef<SignatureCanvas | null>(null);
   const [isDownloading, setIsDownloading] = React.useState(false);
   const [showFullPreview, setShowFullPreview] = React.useState(false);
   const [showSignaturePad, setShowSignaturePad] = React.useState(false);
+
+  React.useEffect(() => {
+    if (autoDownload) {
+      const timer = setTimeout(() => {
+        if (docRef.current) {
+          handleDownloadPDF().then(() => {
+            if (onComplete) onComplete();
+          });
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [autoDownload]);
 
   const clearSignature = () => {
     if (onUpdate) {
@@ -65,13 +80,19 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
         allowTaint: true,
         backgroundColor: '#ffffff',
         onclone: (clonedDoc) => {
-          // Forcefully remove modern CSS color functions from all style tags in the clone
+          // Remove all style/link tags that might contain the problematic CSS or sanitize them
           const styleTags = clonedDoc.getElementsByTagName('style');
           for (let i = 0; i < styleTags.length; i++) {
-            // Aggressive replacement for any oklab/oklch strings
-            styleTags[i].innerHTML = styleTags[i].innerHTML.replace(/okl(ab|ch)\s*\([^)]+\)/gi, '#000000');
-            // Also replace any variables that might be holding these colors
-            styleTags[i].innerHTML = styleTags[i].innerHTML.replace(/--[\w-]+\s*:\s*okl(ab|ch)\s*\([^)]+\)/gi, '--fixed: #000000');
+            try {
+              let cssText = styleTags[i].innerHTML;
+              // Aggressive replacement for any oklab/oklch strings
+              cssText = cssText.replace(/okl(ab|ch)\s*\([^)]+\)/gi, '#000000');
+              // Replace variables that might be holding these colors
+              cssText = cssText.replace(/--[\w-]+\s*:\s*okl(ab|ch)\s*\([^)]+\)/gi, '--fixed-color: #000000');
+              styleTags[i].innerHTML = cssText;
+            } catch (styleErr) {
+              // ignore
+            }
           }
 
           const elements = clonedDoc.querySelectorAll('*');
@@ -79,10 +100,12 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
             const node = el as HTMLElement;
             try {
               const style = window.getComputedStyle(node);
+              // List of properties likely to contain colors
               const propsToFix = [
                 'color', 'backgroundColor', 'borderColor', 'outlineColor', 
                 'fill', 'stroke', 'boxShadow', 'textShadow', 'borderTopColor', 
-                'borderBottomColor', 'borderLeftColor', 'borderRightColor'
+                'borderBottomColor', 'borderLeftColor', 'borderRightColor',
+                'border-color', 'background-color'
               ];
               
               propsToFix.forEach(prop => {
@@ -93,6 +116,7 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
                   if (prop.toLowerCase().includes('background')) fallback = '#ffffff';
                   if (val.includes('blue') || val.includes('2563eb')) fallback = '#2563eb';
                   if (val.includes('slate') || val.includes('64748b')) fallback = '#64748b';
+                  if (prop === 'boxShadow') fallback = 'none';
                   
                   node.style.setProperty(prop, fallback, 'important');
                 }

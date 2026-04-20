@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Users, FileText, CreditCard, ReceiptText, Eye, Trash2 } from 'lucide-react';
+import { TrendingUp, Users, FileText, CreditCard, ReceiptText, Eye, Trash2, Download } from 'lucide-react';
 import { PayrollSlipData, Decharge } from '../types';
 
 interface DashboardProps {
@@ -10,6 +10,8 @@ interface DashboardProps {
   onDeleteSlip?: (id: string) => void;
   onDeleteDecharge?: (id: string) => void;
   onReset?: () => void;
+  onDownloadSlip?: (slip: PayrollSlipData) => void;
+  onDownloadDecharge?: (decharge: Decharge) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ 
@@ -19,8 +21,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onViewDecharge,
   onDeleteSlip,
   onDeleteDecharge,
-  onReset
+  onReset,
+  onDownloadSlip,
+  onDownloadDecharge
 }) => {
+  const [confirmingDelete, setConfirmingDelete] = React.useState<{id: string, type: 'slip' | 'decharge'} | null>(null);
+
   const totalNet = history.reduce((acc, slip) => acc + (slip?.netPay || 0), 0);
   const totalGross = history.reduce((acc, slip) => acc + (slip?.grossSalary || 0), 0);
   const totalCost = history.reduce((acc, slip) => acc + (slip?.totalEmployerCost || 0), 0);
@@ -79,21 +85,60 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </td>
                       <td className="px-6 py-4 text-[#64748b] font-medium cursor-pointer" onClick={() => onViewSlip(slip)}>{slip.period}</td>
                       <td className="px-6 py-4 font-black text-[#1e293b]">
-                        <div className="flex items-center justify-between gap-4">
-                          <span className="cursor-pointer" onClick={() => onViewSlip(slip)}>{slip.netPay.toLocaleString('fr-FR')}</span>
+                        <div className="flex items-center justify-end gap-3">
+                          <span className="cursor-pointer mr-auto" onClick={() => onViewSlip(slip)}>{slip.netPay.toLocaleString('fr-FR')}</span>
+                          
+                          {onDownloadSlip && (
+                             <button
+                               title="Télécharger PDF"
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 onDownloadSlip(slip);
+                               }}
+                               className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-all"
+                             >
+                               <Download size={16} />
+                             </button>
+                          )}
+
                           {onDeleteSlip && (
-                            <button
-                              title="Déplacer vers la corbeille"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (window.confirm("Envoyer ce bulletin à la corbeille ?")) {
-                                  onDeleteSlip(slip.id || '');
-                                }
-                              }}
-                              className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded transition-all"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <div className="relative">
+                              {confirmingDelete?.id === slip.id && confirmingDelete?.type === 'slip' ? (
+                                <div className="absolute right-0 bottom-full mb-2 bg-[#1e293b] text-white p-2 rounded shadow-xl z-10 flex items-center gap-2 whitespace-nowrap text-[10px]">
+                                  <span>Confirmer ?</span>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteSlip(slip.id || '');
+                                      setConfirmingDelete(null);
+                                    }}
+                                    className="bg-red-500 px-2 py-1 rounded font-bold hover:bg-red-600"
+                                  >
+                                    OUI
+                                  </button>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setConfirmingDelete(null);
+                                    }}
+                                    className="bg-gray-600 px-2 py-1 rounded font-bold hover:bg-gray-500"
+                                  >
+                                    NON
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  title="Déplacer vers la corbeille"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmingDelete({ id: slip.id || '', type: 'slip' });
+                                  }}
+                                  className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded transition-all"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>
@@ -141,21 +186,60 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </td>
                       <td className="px-6 py-4 text-[#64748b] font-medium cursor-pointer" onClick={() => onViewDecharge(dec)}>{new Date(dec.date).toLocaleDateString('fr-FR')}</td>
                       <td className="px-6 py-4 font-black text-[#1e293b]">
-                        <div className="flex justify-between items-center gap-4">
-                          <span className="cursor-pointer" onClick={() => onViewDecharge(dec)}>{dec.amount.toLocaleString('fr-FR')}</span>
+                        <div className="flex justify-between items-center gap-3">
+                          <span className="cursor-pointer mr-auto" onClick={() => onViewDecharge(dec)}>{dec.amount.toLocaleString('fr-FR')}</span>
+                          
+                          {onDownloadDecharge && (
+                             <button
+                               title="Télécharger PDF"
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 onDownloadDecharge(dec);
+                               }}
+                               className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-all"
+                             >
+                               <Download size={16} />
+                             </button>
+                          )}
+
                           {onDeleteDecharge && (
-                            <button
-                              title="Déplacer vers la corbeille"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (window.confirm("Envoyer cette décharge à la corbeille ?")) {
-                                  onDeleteDecharge(dec.id || '');
-                                }
-                              }}
-                              className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded transition-all"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            <div className="relative">
+                               {confirmingDelete?.id === dec.id && confirmingDelete?.type === 'decharge' ? (
+                                <div className="absolute right-0 bottom-full mb-2 bg-[#1e293b] text-white p-2 rounded shadow-xl z-10 flex items-center gap-2 whitespace-nowrap text-[10px]">
+                                  <span>Confirmer ?</span>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteDecharge(dec.id || '');
+                                      setConfirmingDelete(null);
+                                    }}
+                                    className="bg-red-500 px-2 py-1 rounded font-bold hover:bg-red-600"
+                                  >
+                                    OUI
+                                  </button>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setConfirmingDelete(null);
+                                    }}
+                                    className="bg-gray-600 px-2 py-1 rounded font-bold hover:bg-gray-500"
+                                  >
+                                    NON
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  title="Déplacer vers la corbeille"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmingDelete({ id: dec.id || '', type: 'decharge' });
+                                  }}
+                                  className="p-1.5 text-red-400 hover:text-red-700 hover:bg-red-50 rounded transition-all"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>

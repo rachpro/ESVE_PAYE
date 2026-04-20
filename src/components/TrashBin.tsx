@@ -10,6 +10,8 @@ interface TrashBinProps {
   onRestoreDecharge: (id: string) => void;
   onDeleteSlip: (id: string) => void;
   onDeleteDecharge: (id: string) => void;
+  onEmptySlips?: () => void;
+  onEmptyDecharges?: () => void;
 }
 
 export const TrashBin: React.FC<TrashBinProps> = ({
@@ -18,16 +20,27 @@ export const TrashBin: React.FC<TrashBinProps> = ({
   onRestoreSlip,
   onRestoreDecharge,
   onDeleteSlip,
-  onDeleteDecharge
+  onDeleteDecharge,
+  onEmptySlips,
+  onEmptyDecharges
 }) => {
-  const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'slip' | 'decharge', name: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string | 'all', type: 'slip' | 'decharge', name: string } | null>(null);
 
   const handleConfirmDelete = () => {
     if (!confirmDelete) return;
-    if (confirmDelete.type === 'slip') {
-      onDeleteSlip(confirmDelete.id);
+    
+    if (confirmDelete.id === 'all') {
+      if (confirmDelete.type === 'slip' && onEmptySlips) {
+        onEmptySlips();
+      } else if (confirmDelete.type === 'decharge' && onEmptyDecharges) {
+        onEmptyDecharges();
+      }
     } else {
-      onDeleteDecharge(confirmDelete.id);
+      if (confirmDelete.type === 'slip') {
+        onDeleteSlip(confirmDelete.id);
+      } else {
+        onDeleteDecharge(confirmDelete.id);
+      }
     }
     setConfirmDelete(null);
   };
@@ -62,43 +75,58 @@ export const TrashBin: React.FC<TrashBinProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  trashedHistory.map((slip, idx) => (
-                    <tr key={slip.id || idx} className="hover:bg-[#f8fafc] transition-colors group">
-                      <td className="px-6 py-4">
-                        <p className="font-semibold text-sm text-[#1e293b]">{slip.employee.lastName} {slip.employee.firstName}</p>
-                        <p className="text-xs text-[#64748b]">{slip.employee.position}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-xs font-medium text-[#475569] bg-[#f1f5f9] px-2.5 py-1 rounded-md border border-[#e2e8f0]">
-                          {slip.period}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2 transition-opacity">
+                  <>
+                    {trashedHistory.map((slip, idx) => (
+                      <tr key={slip.id || idx} className="hover:bg-[#f8fafc] transition-colors group">
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-sm text-[#1e293b]">{slip.employee.lastName} {slip.employee.firstName}</p>
+                          <p className="text-xs text-[#64748b]">{slip.employee.position}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-medium text-[#475569] bg-[#f1f5f9] px-2.5 py-1 rounded-md border border-[#e2e8f0]">
+                            {slip.period}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2 transition-opacity">
+                            <button
+                              onClick={() => onRestoreSlip(slip.id || '')}
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors tooltip-restaure"
+                              title="Restaurer"
+                            >
+                              <ArrowUpLeft size={16} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setConfirmDelete({ 
+                                  id: slip.id || '', 
+                                  type: 'slip', 
+                                  name: `Bulletin - ${slip.employee.lastName} ${slip.employee.firstName}` 
+                                });
+                              }}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors tooltip-supr"
+                              title="Supprimer définitivement"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {onEmptySlips && (
+                      <tr className="bg-red-50/20">
+                        <td colSpan={3} className="p-4 text-center">
                           <button
-                            onClick={() => onRestoreSlip(slip.id || '')}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors tooltip-restaure"
-                            title="Restaurer"
+                            onClick={() => setConfirmDelete({ id: 'all', type: 'slip', name: 'TOUS les bulletins de la corbeille' })}
+                            className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center justify-center gap-2 mx-auto uppercase tracking-wide"
                           >
-                            <ArrowUpLeft size={16} />
+                            <Trash2 size={14} />
+                            Vider tous les bulletins
                           </button>
-                          <button
-                            onClick={() => {
-                              setConfirmDelete({ 
-                                id: slip.id || '', 
-                                type: 'slip', 
-                                name: `Bulletin - ${slip.employee.lastName} ${slip.employee.firstName}` 
-                              });
-                            }}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors tooltip-supr"
-                            title="Supprimer définitivement"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )}
               </tbody>
             </table>
@@ -126,43 +154,58 @@ export const TrashBin: React.FC<TrashBinProps> = ({
                     </td>
                   </tr>
                 ) : (
-                  trashedDecharges.map((decharge, idx) => (
-                    <tr key={decharge.id || idx} className="hover:bg-[#f8fafc] transition-colors group">
-                      <td className="px-6 py-4">
-                        <p className="font-semibold text-sm text-[#1e293b]">{decharge.beneficiaryName}</p>
-                        <p className="text-xs text-[#64748b]">{decharge.purpose}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-xs font-medium text-[#475569] bg-[#f1f5f9] px-2.5 py-1 rounded-md border border-[#e2e8f0]">
-                          {decharge.date}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2 transition-opacity">
+                  <>
+                    {trashedDecharges.map((decharge, idx) => (
+                      <tr key={decharge.id || idx} className="hover:bg-[#f8fafc] transition-colors group">
+                        <td className="px-6 py-4">
+                          <p className="font-semibold text-sm text-[#1e293b]">{decharge.beneficiaryName}</p>
+                          <p className="text-xs text-[#64748b]">{decharge.purpose}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-medium text-[#475569] bg-[#f1f5f9] px-2.5 py-1 rounded-md border border-[#e2e8f0]">
+                            {decharge.date}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2 transition-opacity">
+                            <button
+                              onClick={() => onRestoreDecharge(decharge.id || '')}
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors tooltip-restaure"
+                              title="Restaurer"
+                            >
+                              <ArrowUpLeft size={16} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setConfirmDelete({ 
+                                  id: decharge.id || '', 
+                                  type: 'decharge', 
+                                  name: `Décharge - ${decharge.beneficiaryName}` 
+                                });
+                              }}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors tooltip-supr"
+                              title="Supprimer définitivement"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {onEmptyDecharges && (
+                      <tr className="bg-red-50/20">
+                        <td colSpan={3} className="p-4 text-center">
                           <button
-                            onClick={() => onRestoreDecharge(decharge.id || '')}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors tooltip-restaure"
-                            title="Restaurer"
+                            onClick={() => setConfirmDelete({ id: 'all', type: 'decharge', name: 'TOUTES les décharges de la corbeille' })}
+                            className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center justify-center gap-2 mx-auto uppercase tracking-wide"
                           >
-                            <ArrowUpLeft size={16} />
+                            <Trash2 size={14} />
+                            Vider toutes les décharges
                           </button>
-                          <button
-                            onClick={() => {
-                              setConfirmDelete({ 
-                                id: decharge.id || '', 
-                                type: 'decharge', 
-                                name: `Décharge - ${decharge.beneficiaryName}` 
-                              });
-                            }}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors tooltip-supr"
-                            title="Supprimer définitivement"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )}
               </tbody>
             </table>
@@ -187,7 +230,17 @@ export const TrashBin: React.FC<TrashBinProps> = ({
                 </div>
                 
                 <p className="text-[#64748b] mb-6">
-                  Êtes-vous sûr de vouloir supprimer définitivement <span className="font-bold text-[#1e293b]">{confirmDelete.name}</span> ? Cette action est définitive et les données ne pourront plus être récupérées.
+                  {confirmDelete.id === 'all' ? (
+                    <>
+                      Attention ! Vous allez supprimer <span className="font-bold text-red-600 underline">DÉFINITIVEMENT</span> {confirmDelete.name}.
+                      <br/><br/>
+                      Cette action effacera tout le contenu sélectionné dans la corbeille sans possibilité de retour.
+                    </>
+                  ) : (
+                    <>
+                      Êtes-vous sûr de vouloir supprimer définitivement <span className="font-bold text-[#1e293b]">{confirmDelete.name}</span> ? Cette action est définitive et les données ne pourront plus être récupérées.
+                    </>
+                  )}
                 </p>
 
                 <div className="flex gap-3">

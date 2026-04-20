@@ -76,6 +76,10 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  const [downloadingSlip, setDownloadingSlip] = useState<PayrollSlipData | null>(null);
+  const [downloadingDecharge, setDownloadingDecharge] = useState<Decharge | null>(null);
+
   useEffect(() => {
     localStorage.setItem('employees_data', JSON.stringify(employees));
   }, [employees]);
@@ -300,17 +304,29 @@ export default function App() {
   };
 
   const handleResetAllData = () => {
-    if (window.confirm("CETTE ACTION EST IRRÉVERSIBLE. Voulez-vous vraiment supprimer TOUS les bulletins, décharges, employés et informations d'entreprise de votre stockage local ?")) {
-      setEmployees([]);
-      setHistory([]);
-      setDechargeHistory([]);
-      setTrashedHistory([]);
-      setTrashedDecharges([]);
-      setCompany(DEFAULT_COMPANY);
-      localStorage.clear();
-      setActiveTab('dashboard');
-      alert("Toutes les données ont été réinitialisées.");
-    }
+    setConfirmingReset(true);
+  };
+
+  const handleEmptyTrashedSlips = () => {
+    setTrashedHistory([]);
+    localStorage.removeItem('trashed_history');
+  };
+
+  const handleEmptyTrashedDecharges = () => {
+    setTrashedDecharges([]);
+    localStorage.removeItem('trashed_decharges');
+  };
+
+  const executeReset = () => {
+    setEmployees([]);
+    setHistory([]);
+    setDechargeHistory([]);
+    setTrashedHistory([]);
+    setTrashedDecharges([]);
+    setCompany(DEFAULT_COMPANY);
+    localStorage.clear();
+    setConfirmingReset(false);
+    setActiveTab('dashboard');
   };
 
   const renderContent = () => {
@@ -324,6 +340,8 @@ export default function App() {
           onDeleteSlip={(id) => handleDeleteSlip(id, false)}
           onDeleteDecharge={(id) => handleDeleteDecharge(id, false)}
           onReset={handleResetAllData}
+          onDownloadSlip={setDownloadingSlip}
+          onDownloadDecharge={setDownloadingDecharge}
         />;
       case 'generate':
         return <PayrollForm employees={employees} company={company} onGenerate={handleGenerate} />;
@@ -371,6 +389,8 @@ export default function App() {
           onDeleteSlip={(id) => handleDeleteSlip(id, false)}
           onDeleteDecharge={(id) => handleDeleteDecharge(id, false)}
           onReset={handleResetAllData}
+          onDownloadSlip={setDownloadingSlip}
+          onDownloadDecharge={setDownloadingDecharge}
         />;
       case 'corbeille':
         return <TrashBin 
@@ -380,6 +400,8 @@ export default function App() {
           onRestoreDecharge={handleRestoreDecharge}
           onDeleteSlip={(id) => handleDeleteSlip(id, true)}
           onDeleteDecharge={(id) => handleDeleteDecharge(id, true)}
+          onEmptySlips={handleEmptyTrashedSlips}
+          onEmptyDecharges={handleEmptyTrashedDecharges}
         />;
       default:
         return <Dashboard 
@@ -390,6 +412,8 @@ export default function App() {
           onDeleteSlip={(id) => handleDeleteSlip(id, false)}
           onDeleteDecharge={(id) => handleDeleteDecharge(id, false)}
           onReset={handleResetAllData}
+          onDownloadSlip={setDownloadingSlip}
+          onDownloadDecharge={setDownloadingDecharge}
         />;
     }
   };
@@ -408,7 +432,64 @@ export default function App() {
           {renderContent()}
         </motion.div>
       </AnimatePresence>
+
+      {/* Global Confirmation Modal for Reset */}
+      <AnimatePresence>
+        {confirmingReset && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+             <motion.div 
+               initial={{ opacity: 0, scale: 0.95 }}
+               animate={{ opacity: 1, scale: 1 }}
+               exit={{ opacity: 0, scale: 0.95 }}
+               className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl border border-red-100"
+             >
+                <div className="text-center space-y-4">
+                   <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500">
+                      <TrashBinIcon size={32} />
+                   </div>
+                   <h3 className="text-xl font-black text-gray-900 border-b pb-2">RÉINITIALISATION TOTALE</h3>
+                   <p className="text-sm text-gray-500 leading-relaxed">
+                     Cette action supprimera **définitivement** tous les bulletins, décharges, employés et réglages. 
+                     <br/><br/>
+                     <span className="font-bold text-red-600">Action irréversible !</span>
+                   </p>
+                   <div className="grid grid-cols-2 gap-3 pt-4">
+                      <button 
+                        onClick={() => setConfirmingReset(false)}
+                        className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition-all"
+                      >
+                        ANNULER
+                      </button>
+                      <button 
+                        onClick={executeReset}
+                        className="px-4 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-100"
+                      >
+                        EFFACER TOUT
+                      </button>
+                   </div>
+                </div>
+             </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Programmatic Downloader Overlays (Stable hidden container for rendering) */}
+      <div className="fixed top-0 left-0 opacity-0 pointer-events-none -z-[100] h-auto overflow-visible w-[210mm]">
+         {downloadingSlip && (
+            <div key={`dl-slip-${downloadingSlip.id}`} className="bg-white">
+               <PayrollSlip data={downloadingSlip} autoDownload onComplete={() => setDownloadingSlip(null)} />
+            </div>
+         )}
+         {downloadingDecharge && (
+            <div key={`dl-dec-${downloadingDecharge.id}`} className="bg-white">
+               <DechargeDocument data={downloadingDecharge} autoDownload onComplete={() => setDownloadingDecharge(null)} />
+            </div>
+         )}
+      </div>
     </Layout>
   );
 }
+
+// Reuse icon for the modal
+import { Trash2 as TrashBinIcon } from 'lucide-react';
 

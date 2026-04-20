@@ -78,6 +78,7 @@ export interface PayrollSlipData {
   netPay: number;
   totalEmployerCost: number;
   convention?: string;
+  contractType?: string;
   leaveAcquired?: number;
   leaveTaken?: number;
   leaveBalance?: number;

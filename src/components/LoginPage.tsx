@@ -50,7 +50,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ company, onLogin, onEmailL
       } else if (errorCode === 'auth/user-disabled') {
         errorMessage = 'Ce compte a été désactivé. Veuillez contacter le support.';
       } else if (errorCode === 'auth/operation-not-allowed') {
-        errorMessage = "La connexion par email/mot de passe n'est pas activée pour ce projet.";
+        errorMessage = (
+          <div className="space-y-2">
+            <p>La connexion par email/mot de passe n'est pas activée pour ce projet.</p>
+            <p className="text-[10px] opacity-80 bg-red-100 p-2 rounded">
+              Action requise : Allez dans votre Console Firebase → Authentication → Sign-in method → Activez "Email/Password".
+            </p>
+          </div>
+        ) as any;
       } else if (errorCode === 'auth/too-many-requests') {
         errorMessage = "Trop de tentatives infructueuses. Votre compte a été temporairement bloqué par sécurité. Réessayez plus tard.";
       } else if (errorCode === 'auth/network-request-failed') {
@@ -104,9 +111,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ company, onLogin, onEmailL
               {company.logo ? (
                 <img src={company.logo} alt="Logo" className="h-16 w-auto object-contain drop-shadow-sm" referrerPolicy="no-referrer" />
               ) : (
-                <div className="h-16 w-16 bg-[#eff6ff] text-[#2563eb] rounded-2xl flex items-center justify-center">
-                  <ShieldCheck size={32} />
-                </div>
+              <div className="h-16 w-16 bg-[#eff6ff] text-[#2563eb] rounded-2xl flex items-center justify-center border-2 border-dashed border-blue-200">
+                <ShieldCheck size={32} />
+              </div>
               )}
             </div>
 

@@ -24,6 +24,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
   const [isGenerating, setIsGenerating] = useState(false);
   const [customLines, setCustomLines] = useState<PayrollLine[]>([]);
   const [convention, setConvention] = useState('Commerce Général');
+  const [contractType, setContractType] = useState('CDI');
   const [leaveAcquired, setLeaveAcquired] = useState(2.5);
   const [leaveTaken, setLeaveTaken] = useState(0);
   const [leaveBalance, setLeaveBalance] = useState(22.5);
@@ -96,6 +97,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       netPay: netPay,
       totalEmployerCost: earnings + empCharges,
       convention,
+      contractType,
       leaveAcquired,
       leaveTaken,
       leaveBalance,
@@ -188,6 +190,21 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Convention collective</label>
             <input type="text" value={convention || ''} onChange={(e) => setConvention(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[#e2e8f0] text-sm" />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Type de contrat</label>
+            <select 
+              value={contractType || ''} 
+              onChange={(e) => setContractType(e.target.value)} 
+              className="w-full px-3 py-2 rounded-lg border border-[#e2e8f0] text-sm bg-white"
+            >
+              <option value="CDI">CDI</option>
+              <option value="CDD">CDD</option>
+              <option value="Stage">Stage</option>
+              <option value="Interim">Interim</option>
+              <option value="Freelance">Freelance</option>
+              <option value="Autre">Autre</option>
+            </select>
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Solde Congés</label>
