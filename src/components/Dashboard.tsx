@@ -1,6 +1,7 @@
-import React from 'react';
-import { TrendingUp, Users, FileText, CreditCard, ReceiptText, Eye, Trash2, Download } from 'lucide-react';
+import React, { useState } from 'react';
+import { TrendingUp, Users, FileText, CreditCard, ReceiptText, Eye, Trash2, Download, Share2, Link, Mail, Check, X as CloseIcon } from 'lucide-react';
 import { PayrollSlipData, Decharge } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface DashboardProps {
   history: PayrollSlipData[];
@@ -25,7 +26,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onDownloadSlip,
   onDownloadDecharge
 }) => {
-  const [confirmingDelete, setConfirmingDelete] = React.useState<{id: string, type: 'slip' | 'decharge'} | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState<{id: string, type: 'slip' | 'decharge'} | null>(null);
+  const [activeShareMenu, setActiveShareMenu] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyLink = (slip: PayrollSlipData) => {
+    const url = window.location.href; // Simplified link
+    navigator.clipboard.writeText(url);
+    setCopiedId(slip.id || 'copied');
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleSendEmail = (slip: PayrollSlipData) => {
+    if (!slip.employee.email) {
+      alert("L'employé n'a pas d'adresse email enregistrée.");
+      return;
+    }
+    const subject = encodeURIComponent(`Votre Bulletin de Paie - ${slip.period}`);
+    const body = encodeURIComponent(`Bonjour ${slip.employee.firstName},\n\nVeuillez trouver ci-joint votre bulletin de paie pour la période de ${slip.period}.\n\nCordialement,\nLa Direction`);
+    window.location.href = `mailto:${slip.employee.email}?subject=${subject}&body=${body}`;
+  };
 
   const totalNet = history.reduce((acc, slip) => acc + (slip?.netPay || 0), 0);
   const totalGross = history.reduce((acc, slip) => acc + (slip?.grossSalary || 0), 0);
@@ -100,6 +120,56 @@ export const Dashboard: React.FC<DashboardProps> = ({
                                <Download size={16} />
                              </button>
                           )}
+
+                          <div className="relative">
+                            <button
+                              title="Partager"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveShareMenu(activeShareMenu === slip.id ? null : (slip.id || null));
+                              }}
+                              className={`p-1.5 rounded transition-all ${activeShareMenu === slip.id ? 'bg-orange-100 text-orange-600' : 'text-orange-400 hover:text-orange-600 hover:bg-orange-50'}`}
+                            >
+                              <Share2 size={16} />
+                            </button>
+
+                            <AnimatePresence>
+                              {activeShareMenu === slip.id && (
+                                <motion.div 
+                                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                  className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 z-[50] overflow-hidden"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div className="p-2 space-y-1">
+                                    <button 
+                                      onClick={() => handleCopyLink(slip)}
+                                      className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                                    >
+                                      {copiedId === slip.id ? <Check size={14} className="text-green-500" /> : <Link size={14} className="text-blue-500" />}
+                                      {copiedId === slip.id ? 'Lien copié !' : 'Copier le lien'}
+                                    </button>
+                                    <button 
+                                      onClick={() => handleSendEmail(slip)}
+                                      className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                                    >
+                                      <Mail size={14} className="text-orange-500" />
+                                      Envoyer par email
+                                    </button>
+                                    <div className="h-px bg-gray-100 my-1"></div>
+                                    <button 
+                                      onClick={() => setActiveShareMenu(null)}
+                                      className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-lg transition-colors text-left"
+                                    >
+                                      <CloseIcon size={14} />
+                                      Fermer
+                                    </button>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
 
                           {onDeleteSlip && (
                             <div className="relative">

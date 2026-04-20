@@ -365,57 +365,86 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
 
       <AnimatePresence>
         {showConfirm && pendingSlip && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-blue-100"
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-blue-50"
             >
-              <div className="bg-blue-600 p-6 text-white flex items-center gap-4">
-                <div className="bg-white/20 p-3 rounded-full">
-                  <AlertCircle size={24} />
+              <div className="bg-[#2563eb] p-8 text-white relative">
+                <div className="absolute top-0 right-0 p-8 opacity-10">
+                  <Calculator size={120} />
                 </div>
-                <div>
-                  <h3 className="font-bold text-lg">Vérification Finale</h3>
-                  <p className="text-blue-100 text-xs">Veuillez confirmer les informations avant la génération.</p>
+                <div className="relative flex items-center gap-5">
+                  <div className="bg-white/20 p-4 rounded-2xl backdrop-blur-md border border-white/30 shadow-inner">
+                    <CheckCircle2 size={32} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-2xl uppercase tracking-tighter">Récapitulatif de Paie</h3>
+                    <p className="text-blue-100 text-sm font-medium opacity-90">Vérifiez les montants avant de générer le bulletin final.</p>
+                  </div>
                 </div>
               </div>
               
-              <div className="p-6 space-y-4">
-                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-                  <div className="flex justify-between border-b border-gray-100 pb-2">
-                    <span className="text-xs text-gray-500 uppercase font-bold tracking-tight">Employé</span>
-                    <span className="text-sm font-black text-gray-800">{pendingSlip.employee.firstName} {pendingSlip.employee.lastName}</span>
+              <div className="p-8 space-y-6">
+                {/* Employee Header */}
+                <div className="flex items-center gap-4 border-b border-gray-100 pb-6">
+                  <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-xl font-black shadow-inner">
+                    {pendingSlip.employee.firstName.charAt(0)}
                   </div>
-                  <div className="flex justify-between border-b border-gray-100 pb-2">
-                    <span className="text-xs text-gray-500 uppercase font-bold tracking-tight">Période</span>
-                    <span className="text-sm font-black text-gray-800">{pendingSlip.period}</span>
-                  </div>
-                  <div className="flex justify-between font-black text-lg pt-1">
-                    <span className="text-blue-600 uppercase text-xs self-center">Net à Payer</span>
-                    <span className="text-[#1e293b]">{pendingSlip.netPay.toLocaleString('fr-FR')} FCFA</span>
+                  <div>
+                    <h4 className="font-black text-[#1e293b] text-lg leading-tight uppercase">{pendingSlip.employee.firstName} {pendingSlip.employee.lastName}</h4>
+                    <p className="text-[#64748b] text-xs font-bold uppercase tracking-widest mt-0.5">{pendingSlip.employee.position} — <span className="text-blue-600">{pendingSlip.period}</span></p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100 italic text-[11px] text-blue-800">
-                  <CheckCircle2 size={14} className="mt-0.5 flex-shrink-0" />
-                  En confirmant, le bulletin sera officiellement enregistré dans l'historique de l'entreprise.
+                {/* Financial Summary Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-green-50/50 rounded-2xl p-4 border border-green-100/50">
+                    <p className="text-[10px] font-black text-green-700 uppercase tracking-widest mb-1">Total Gains</p>
+                    <p className="text-xl font-black text-green-800">{pendingSlip.grossSalary.toLocaleString('fr-FR')} <span className="text-xs">FCFA</span></p>
+                  </div>
+                  <div className="bg-red-50/50 rounded-2xl p-4 border border-red-100/50">
+                    <p className="text-[10px] font-black text-red-700 uppercase tracking-widest mb-1">Total Retenues</p>
+                    <p className="text-xl font-black text-red-800">{(pendingSlip.grossSalary - pendingSlip.netPay).toLocaleString('fr-FR')} <span className="text-xs">FCFA</span></p>
+                  </div>
                 </div>
 
-                <div className="flex gap-3 pt-2">
+                {/* Net Pay Highlight */}
+                <div className="bg-[#1e293b] rounded-2xl p-6 text-white shadow-xl shadow-blue-900/10 relative overflow-hidden">
+                  <div className="relative z-10 flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1">Montant Net à Payer</p>
+                      <h2 className="text-3xl font-black tabular-nums tracking-tighter">{pendingSlip.netPay.toLocaleString('fr-FR')} <span className="text-lg opacity-60">FCFA</span></h2>
+                    </div>
+                    <div className="bg-blue-600/20 p-3 rounded-xl border border-blue-500/30">
+                      <DollarSign size={24} className="text-blue-400" />
+                    </div>
+                  </div>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+                </div>
+
+                {/* Info Text */}
+                <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-100/50 text-[11px] text-amber-800 leading-relaxed font-medium">
+                  <AlertCircle size={16} className="flex-shrink-0 mt-0.5 text-amber-500" />
+                  <span>Cette action est irréversible. Le bulletin sera instantanément généré et ajouté à l'historique permanent du salarié pour la période de <b>{pendingSlip.period}</b>.</span>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-4 pt-2">
                   <button
                     onClick={() => { setShowConfirm(false); setPendingSlip(null); }}
-                    className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all"
+                    className="flex-1 px-6 py-4 border-2 border-gray-100 rounded-2xl text-sm font-black text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-all uppercase tracking-widest"
                   >
                     Annuler
                   </button>
                   <button
                     onClick={handleConfirm}
-                    className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-black hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2"
+                    className="flex-1 px-6 py-4 bg-[#2563eb] text-white rounded-2xl text-sm font-black hover:bg-blue-700 shadow-[0_10px_25px_-5px_rgba(37,99,235,0.4)] transition-all flex items-center justify-center gap-3 uppercase tracking-widest"
                   >
-                    <CheckCircle2 size={18} />
-                    Confirmer
+                    <CheckCircle2 size={20} />
+                    Valider
                   </button>
                 </div>
               </div>

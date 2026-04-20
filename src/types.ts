@@ -36,6 +36,7 @@ export interface Employee {
   department?: string;
   qualification?: string;
   workingHours?: number;
+  email?: string;
 }
 
 export interface PayrollLine {

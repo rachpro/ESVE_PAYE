@@ -52,6 +52,7 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
   const handlePrint = () => {
     if (!docRef.current) return;
     
+    // Create a temporary container for printing to apply specific print styles if needed
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert("La fenêtre d'impression a été bloquée. Veuillez autoriser les pop-ups.");
@@ -65,17 +66,36 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
           <title>Impression Décharge - ${data.beneficiaryName}</title>
           <script src="https://cdn.tailwindcss.com"></script>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-            body { font-family: 'Inter', sans-serif; padding: 40px; }
-            @page { size: A4; margin: 0; }
-            @media print {
-              body { padding: 0; margin: 0; }
-              .no-print { display: none !important; }
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700&display=swap');
+            body { 
+              font-family: 'Inter', sans-serif; 
+              padding: 0; 
+              margin: 0; 
+              background: white;
             }
+            .print-container {
+              width: 210mm;
+              min-height: 297mm;
+              margin: 0 auto;
+              padding: 20mm;
+              background: white;
+            }
+            @page { 
+              size: A4; 
+              margin: 0; 
+            }
+            @media print {
+              body { margin: 0; padding: 0; }
+              .no-print { display: none !important; }
+              .shadow-sm, .shadow-xl, .shadow-2xl { box-shadow: none !important; }
+              .border { border: 1px solid #e2e8f0 !important; }
+              .bg-gray-50 { background-color: #f8fafc !important; }
+            }
+            h1 { font-family: 'Playfair Display', serif; }
           </style>
         </head>
-        <body onload="setTimeout(() => { window.print(); window.close(); }, 500)">
-          <div class="max-w-[210mm] mx-auto">
+        <body onload="setTimeout(() => { window.print(); window.close(); }, 800)">
+          <div class="print-container">
             ${content}
           </div>
         </body>

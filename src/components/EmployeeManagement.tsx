@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Employee } from '../types';
-import { UserPlus, MapPin, Hash, Briefcase, DollarSign, Clock, Trash2, Edit2, X, Save, AlertTriangle } from 'lucide-react';
+import { UserPlus, MapPin, Hash, Briefcase, DollarSign, Clock, Trash2, Edit2, X, Save, AlertTriangle, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface EmployeeManagementProps {
@@ -36,7 +36,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
     indice: '',
     department: '',
     qualification: '',
-    workingHours: 173
+    workingHours: 173,
+    email: ''
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -56,6 +57,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
     if (!formData.firstName?.trim()) newErrors.firstName = 'Le prénom est obligatoire';
     if (!formData.lastName?.trim()) newErrors.lastName = 'Le nom est obligatoire';
     if (!formData.position?.trim()) newErrors.position = 'Le poste est obligatoire';
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Format d\'email invalide';
     if (!formData.baseSalary || formData.baseSalary <= 0) newErrors.baseSalary = 'Le salaire doit être supérieur à 0';
     
     setErrors(newErrors);
@@ -92,7 +94,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
       indice: '',
       department: '',
       qualification: '',
-      workingHours: 173
+      workingHours: 173,
+      email: ''
     });
     setErrors({});
   };
@@ -286,6 +289,21 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
               <input type="number" name="workingHours" value={formData.workingHours || 173} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
             </div>
             <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Email (pour le partage)</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                <input 
+                  type="email" 
+                  name="email" 
+                  value={formData.email || ''} 
+                  onChange={handleChange} 
+                  className={`w-full pl-9 pr-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.email ? 'border-red-500 bg-red-50' : 'border-[#e2e8f0]'}`}
+                  placeholder="exemple@email.com"
+                />
+              </div>
+              {errors.email && <p className="text-[11px] text-red-500 font-medium italic">{errors.email}</p>}
+            </div>
+            <div className="space-y-2">
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">N° CNIB</label>
               <input 
                 type="text" 
@@ -330,7 +348,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
                 <tr key={`${emp.id}-${idx}`} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="font-bold text-[#1e293b]">{emp.firstName} {emp.lastName}</div>
-                    <div className="text-xs text-[#64748b]">{emp.residence || emp.address}</div>
+                    <div className="text-xs text-[#64748b]">{emp.email || emp.residence || emp.address}</div>
                   </td>
                   <td className="px-6 py-4 text-sm text-[#64748b]">{emp.position}</td>
                   <td className="px-6 py-4">

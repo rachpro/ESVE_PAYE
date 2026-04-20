@@ -11,6 +11,7 @@ export const UserManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
@@ -196,7 +197,10 @@ export const UserManagement: React.FC = () => {
                         <UserCog size={18} />
                       </button>
                       <button 
-                        onClick={() => setConfirmDeleteId(user.uid)}
+                        onClick={() => {
+                          setConfirmDeleteId(user.uid);
+                          setDeleteConfirmationInput('');
+                        }}
                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                         title="Supprimer l'accès"
                       >
@@ -257,18 +261,29 @@ export const UserManagement: React.FC = () => {
                 <AlertTriangle size={36} />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">Supprimer l'accès ?</h3>
-              <p className="text-gray-500 mb-8">Cet utilisateur ne pourra plus accéder à l'application. Cette action peut être annulée en le ré-invitant ou en le recréant.</p>
+              <p className="text-gray-500 mb-6 text-sm">Cet utilisateur ne pourra plus accéder à l'application. Pour confirmer la suppression de <b>{users.find(u => u.uid === confirmDeleteId)?.displayName}</b>, veuillez saisir son nom ci-dessous :</p>
+              
+              <div className="mb-8">
+                <input 
+                  type="text" 
+                  placeholder="Tapez le nom de l'utilisateur" 
+                  className="w-full px-4 py-3 border border-red-200 rounded-xl focus:ring-2 focus:ring-red-100 focus:border-red-400 outline-none transition-all text-center font-medium"
+                  value={deleteConfirmationInput}
+                  onChange={(e) => setDeleteConfirmationInput(e.target.value)}
+                />
+              </div>
+
               <div className="flex gap-4">
                 <button 
                   onClick={() => setConfirmDeleteId(null)}
-                  className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all"
+                  className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all text-sm"
                 >
                   Annuler
                 </button>
                 <button 
                   onClick={() => deleteUserRecord(confirmDeleteId)}
-                  disabled={isUpdating}
-                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-100 flex items-center justify-center gap-2"
+                  disabled={isUpdating || deleteConfirmationInput !== users.find(u => u.uid === confirmDeleteId)?.displayName}
+                  className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-100 flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
                 >
                   {isUpdating ? <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : 'Supprimer'}
                 </button>
