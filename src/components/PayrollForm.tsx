@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Employee, Company } from '../types';
 import { calculatePayroll, DEFAULT_COMPANY } from '../lib/calculations';
-import { Calculator, UserPlus, Calendar, DollarSign, Plus, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Calculator, UserPlus, Calendar, DollarSign, Plus, Trash2, AlertCircle, CheckCircle2, Activity, Layers } from 'lucide-react';
 import { PayrollSlipData, PayrollLine } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -28,19 +28,29 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
   const [leaveAcquired, setLeaveAcquired] = useState(2.5);
   const [leaveTaken, setLeaveTaken] = useState(0);
   const [leaveBalance, setLeaveBalance] = useState(22.5);
+  const [nbCharges, setNbCharges] = useState(1);
+  const [netImposable, setNetImposable] = useState(0);
+  const [overtimeHours, setOvertimeHours] = useState(0);
+  const [benefitsInKind, setBenefitsInKind] = useState(0);
+  const [ytdGrossSalary, setYtdGrossSalary] = useState(0);
+  const [ytdNetImposable, setYtdNetImposable] = useState(0);
+  const [ytdEmployeeCharges, setYtdEmployeeCharges] = useState(0);
+  const [ytdEmployerCharges, setYtdEmployerCharges] = useState(0);
+  const [ytdWorkingHours, setYtdWorkingHours] = useState(0);
 
   const handleEmployeeChange = (id: string) => {
     setSelectedEmployeeId(id);
     const emp = employees.find(e => e.id === id);
     if (emp) {
       setCustomLines([
-        { label: "Salaire de base", base: emp.baseSalary, rate: 1, amount: emp.baseSalary, type: 'earning' },
-        { label: "Prime de transport", amount: 0, type: 'earning' },
-        { label: "Prime de logement", amount: 0, type: 'earning' },
-        { label: "CNSS - Pension vieillesse", base: 0, rate: 5.5, amount: 0, employerAmount: 0, type: 'deduction', category: 'social' },
-        { label: "RAMU - Assurance maladie", base: 0, rate: 2.5, amount: 0, employerAmount: 0, type: 'deduction', category: 'social' },
-        { label: "Abattement forfaitaire (25%)", rate: 25, amount: 0, type: 'deduction', category: 'tax' },
-        { label: "IUTS (15% sur base nette)", rate: 15, amount: 0, type: 'deduction', category: 'tax' }
+        { label: "NB Charges", base: 1, rate: 0, amount: 0, type: 'info' },
+        { label: "Salaire de base", base: emp.baseSalary, rate: 100, amount: emp.baseSalary, type: 'earning' },
+        { label: "Indemnité de logement", amount: 0, type: 'earning' },
+        { label: "Indemnité de transport", amount: 0, type: 'earning' },
+        { label: "Indemnité de fonction", amount: 0, type: 'earning' },
+        { label: "Retenue Assurances vieillesses (CNSS)", base: 0, rate: 5.5, amount: 0, employerAmount: 0, type: 'deduction', category: 'social' },
+        { label: "IUTS (Barème progressif)", rate: 0, amount: 0, type: 'deduction', category: 'tax' },
+        { label: "Retenue FSP 1%", rate: 1, amount: 0, type: 'deduction', category: 'tax' }
       ]);
     }
   };
@@ -84,7 +94,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     const netPay = earnings - deductions;
 
     const slip: PayrollSlipData = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       period,
       paymentDate,
       employee,
@@ -101,6 +111,18 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       leaveAcquired,
       leaveTaken,
       leaveBalance,
+      nbCharges,
+      netImposable: netImposable || netPay,
+      totalEmployeeCharges: deductions,
+      totalEmployerCharges: empCharges,
+      overtimeHours,
+      benefitsInKind,
+      workingHours: employee.workingHours,
+      ytdGrossSalary,
+      ytdNetImposable,
+      ytdEmployeeCharges,
+      ytdEmployerCharges,
+      ytdWorkingHours,
     };
     
     setPendingSlip(slip);
@@ -209,6 +231,52 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Solde Congés</label>
             <input type="number" value={leaveBalance ?? 0} onChange={(e) => setLeaveBalance(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-[#e2e8f0] text-sm" />
+          </div>
+        </div>
+
+        {/* Sage Specific Optional Fields */}
+        <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 space-y-6">
+          <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-800 flex items-center gap-2">
+            <Activity size={14} /> Paramètres optionnels (Modèle Sage)
+          </h4>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-[#64748b]">Nombre de Charges</label>
+              <input type="number" value={nbCharges} onChange={(e) => setNbCharges(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-[#64748b]">Heures Sup.</label>
+              <input type="number" value={overtimeHours} onChange={(e) => setOvertimeHours(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-[#64748b]">Avantages en Nature</label>
+              <input type="number" value={benefitsInKind} onChange={(e) => setBenefitsInKind(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <label className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-2">
+              <Layers size={14} /> Cumuls Annuels (Optionnel)
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase text-[#64748b]">Salaire Brut</label>
+                <input type="number" value={ytdGrossSalary} onChange={(e) => setYtdGrossSalary(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase text-[#64748b]">Net Imposable</label>
+                <input type="number" value={ytdNetImposable} onChange={(e) => setYtdNetImposable(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase text-[#64748b]">Charges Sal.</label>
+                <input type="number" value={ytdEmployeeCharges} onChange={(e) => setYtdEmployeeCharges(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase text-[#64748b]">Charges Pat.</label>
+                <input type="number" value={ytdEmployerCharges} onChange={(e) => setYtdEmployerCharges(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+              </div>
+            </div>
           </div>
         </div>
 

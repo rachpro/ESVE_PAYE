@@ -76,7 +76,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 ) : (
                   history.slice(0, 10).map((slip, idx) => (
                     <tr 
-                      key={slip.id || `slip-${idx}`} 
+                      key={`${slip.id}-${idx}`} 
                       className="hover:bg-blue-50/50 transition-colors text-sm group"
                     >
                       <td className="px-6 py-4 cursor-pointer" onClick={() => onViewSlip(slip)}>
@@ -177,7 +177,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 ) : (
                   dechargeHistory.slice(0, 10).map((dec, idx) => (
                     <tr 
-                      key={dec.id || `dec-${idx}`} 
+                      key={`${dec.id}-${idx}`} 
                       className="hover:bg-blue-50/50 transition-colors text-sm group"
                     >
                       <td className="px-6 py-4 cursor-pointer" onClick={() => onViewDecharge(dec)}>

@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface EmployeeManagementProps {
   employees: Employee[];
-  onAdd: (employee: Employee) => void;
-  onDelete: (id: string) => void;
-  onUpdate: (employee: Employee) => void;
+  onAdd?: (employee: Employee) => void;
+  onDelete?: (id: string) => void;
+  onUpdate?: (employee: Employee) => void;
 }
 
 export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employees, onAdd, onDelete, onUpdate }) => {
@@ -15,6 +15,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const canEdit = !!onAdd && !!onUpdate && !!onDelete;
   const [formData, setFormData] = useState<Partial<Employee>>({
     firstName: '',
     lastName: '',
@@ -28,7 +30,13 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
     hireDate: '',
     category: '',
     seniority: '',
-    paymentMode: 'Virement bancaire'
+    paymentMode: 'Virement bancaire',
+    niveau: '',
+    coefficient: '',
+    indice: '',
+    department: '',
+    qualification: '',
+    workingHours: 173
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -40,7 +48,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
         return newErrors;
       });
     }
-    setFormData(prev => ({ ...prev, [name]: name === 'baseSalary' ? (value === '' ? 0 : Number(value)) : value }));
+    setFormData(prev => ({ ...prev, [name]: (name === 'baseSalary' || name === 'workingHours') ? (value === '' ? 0 : Number(value)) : value }));
   };
 
   const validate = () => {
@@ -78,7 +86,13 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
       hireDate: '',
       category: '',
       seniority: '',
-      paymentMode: 'Virement bancaire'
+      paymentMode: 'Virement bancaire',
+      niveau: '',
+      coefficient: '',
+      indice: '',
+      department: '',
+      qualification: '',
+      workingHours: 173
     });
     setErrors({});
   };
@@ -146,8 +160,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
       </AnimatePresence>
 
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-[#1e293b]">Gestion des EMPLOYÉS</h2>
-        {!isAdding && (
+        <h2 className="text-xl font-bold text-[#1e293b]">Gestion des Employés</h2>
+        {!isAdding && onAdd && (
           <button
             onClick={() => setIsAdding(true)}
             className="bg-[#2563eb] text-white px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-all flex items-center gap-2"
@@ -245,6 +259,32 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
                 <option value="Mobile Money">Mobile Money</option>
               </select>
             </div>
+
+            {/* Additional Info for Sage Layout */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Niveau</label>
+              <input type="text" name="niveau" value={formData.niveau || ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Coefficient</label>
+              <input type="text" name="coefficient" value={formData.coefficient || ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Indice</label>
+              <input type="text" name="indice" value={formData.indice || ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Département</label>
+              <input type="text" name="department" value={formData.department || ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Qualification</label>
+              <input type="text" name="qualification" value={formData.qualification || ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">H. de travail mensuelles</label>
+              <input type="number" name="workingHours" value={formData.workingHours || 173} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
+            </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">N° CNIB</label>
               <input 
@@ -286,8 +326,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e2e8f0]">
-              {employees.map((emp) => (
-                <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
+              {employees.map((emp, idx) => (
+                <tr key={`${emp.id}-${idx}`} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="font-bold text-[#1e293b]">{emp.firstName} {emp.lastName}</div>
                     <div className="text-xs text-[#64748b]">{emp.residence || emp.address}</div>
@@ -302,12 +342,16 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => startEdit(emp)} className="p-2 text-[#64748b] hover:text-[#2563eb] hover:bg-blue-50 rounded-lg transition-all">
-                        <Edit2 size={16} />
-                      </button>
-                      <button onClick={() => confirmDelete(emp.id)} className="p-2 text-[#64748b] hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-                        <Trash2 size={16} />
-                      </button>
+                      {onUpdate && (
+                        <button onClick={() => startEdit(emp)} className="p-2 text-[#64748b] hover:text-[#2563eb] hover:bg-blue-50 rounded-lg transition-all">
+                          <Edit2 size={16} />
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button onClick={() => confirmDelete(emp.id)} className="p-2 text-[#64748b] hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -56,7 +56,10 @@ export const DechargeForm: React.FC<DechargeFormProps> = ({ company, onGenerate 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const decharge = { ...formData, id: Date.now().toString() } as Decharge;
+    const decharge = { 
+      ...formData, 
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}` 
+    } as Decharge;
     setPendingDecharge(decharge);
     setShowConfirm(true);
   };

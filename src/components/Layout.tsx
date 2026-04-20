@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, FileText, Settings, PlusCircle, LogOut, AlertTriangle, X, Trash2, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, Settings, PlusCircle, LogOut, AlertTriangle, X, Trash2, ShieldCheck, UserCog } from 'lucide-react';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
-import { Company } from '../types';
+import { Company, UserRole } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface LayoutProps {
@@ -10,19 +10,25 @@ interface LayoutProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   company: Company;
+  userRole: UserRole;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, company }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, company, userRole }) => {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+  const isAdmin = userRole === 'admin';
+  const isEditor = userRole === 'editor' || isAdmin;
+  const isViewer = userRole === 'viewer';
+
   const menuItems = [
-    { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-    { id: 'employees', label: 'EMPLOYÉ', icon: Users },
-    { id: 'generate', label: 'Bulletins de paie', icon: PlusCircle },
-    { id: 'decharge', label: 'Décharge', icon: FileText },
-    { id: 'history', label: 'Historique', icon: FileText },
-    { id: 'corbeille', label: 'Corbeille', icon: Trash2 },
-    { id: 'settings', label: 'Paramètres', icon: Settings },
+    { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, visible: true },
+    { id: 'employees', label: 'Employés', icon: Users, visible: isEditor },
+    { id: 'generate', label: 'Bulletins de paie', icon: PlusCircle, visible: isEditor },
+    { id: 'decharge', label: 'Décharge', icon: FileText, visible: isEditor },
+    { id: 'history', label: 'Historique', icon: FileText, visible: true },
+    { id: 'corbeille', label: 'Corbeille', icon: Trash2, visible: isEditor },
+    { id: 'users', label: 'Utilisateurs', icon: UserCog, visible: isAdmin },
+    { id: 'settings', label: 'Paramètres', icon: Settings, visible: isAdmin || isEditor },
   ];
 
   const handleLogout = () => {
@@ -101,7 +107,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         </div>
         
         <nav className="flex-1 px-4 space-y-1">
-          {menuItems.filter(i => i.id !== 'settings').map((item) => (
+          {menuItems.filter(i => i.id !== 'settings' && i.id !== 'users' && i.visible).map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
@@ -118,7 +124,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
         </nav>
 
         <div className="p-4 border-t border-[#e2e8f0] space-y-1">
-          {menuItems.filter(i => i.id === 'settings').map((item) => (
+          {menuItems.filter(i => (i.id === 'settings' || i.id === 'users') && i.visible).map((item) => (
             <button 
               key={item.id}
               onClick={() => setActiveTab(item.id)}
@@ -157,14 +163,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
             <p className="text-sm text-[#64748b] mt-1">Période : Avril 2024</p>
           </div>
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setActiveTab('generate')}
-              className="px-5 py-2.5 bg-[#2563eb] text-white rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity"
-            >
-              + Créer un bulletin
-            </button>
-            <div className="w-10 h-10 bg-gray-100 rounded-full border border-gray-200 flex items-center justify-center font-bold text-gray-600">
-              KR
+            {isEditor && (
+              <button 
+                onClick={() => setActiveTab('generate')}
+                className="px-5 py-2.5 bg-[#2563eb] text-white rounded-lg font-semibold text-sm hover:opacity-90 transition-opacity"
+              >
+                + Créer un bulletin
+              </button>
+            )}
+            <div className="w-10 h-10 bg-primary-light rounded-full border border-blue-100 flex items-center justify-center font-bold text-primary">
+              {auth.currentUser?.displayName?.charAt(0) || auth.currentUser?.email?.charAt(0).toUpperCase() || 'U'}
             </div>
           </div>
         </header>

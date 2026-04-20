@@ -50,7 +50,38 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
   };
 
   const handlePrint = () => {
-    window.print();
+    if (!docRef.current) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert("La fenêtre d'impression a été bloquée. Veuillez autoriser les pop-ups.");
+      return;
+    }
+
+    const content = docRef.current.innerHTML;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Impression Décharge - ${data.beneficiaryName}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+            body { font-family: 'Inter', sans-serif; padding: 40px; }
+            @page { size: A4; margin: 0; }
+            @media print {
+              body { padding: 0; margin: 0; }
+              .no-print { display: none !important; }
+            }
+          </style>
+        </head>
+        <body onload="setTimeout(() => { window.print(); window.close(); }, 500)">
+          <div class="max-w-[210mm] mx-auto">
+            ${content}
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const handleDownloadPDF = async () => {

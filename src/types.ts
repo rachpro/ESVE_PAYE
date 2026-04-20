@@ -30,6 +30,12 @@ export interface Employee {
   category?: string;
   seniority?: string;
   paymentMode?: string;
+  niveau?: string;
+  coefficient?: string;
+  indice?: string;
+  department?: string;
+  qualification?: string;
+  workingHours?: number;
 }
 
 export interface PayrollLine {
@@ -64,6 +70,17 @@ export interface Decharge {
   signature?: string;
 }
 
+export type UserRole = 'admin' | 'editor' | 'viewer';
+
+export interface AppUser {
+  uid: string;
+  email: string | null;
+  displayName: string;
+  role: UserRole;
+  createdAt?: string;
+  lastLogin?: string;
+}
+
 export interface PayrollSlipData {
   id: string;
   period: string;
@@ -82,4 +99,17 @@ export interface PayrollSlipData {
   leaveAcquired?: number;
   leaveTaken?: number;
   leaveBalance?: number;
+  nbCharges?: number;
+  netImposable?: number;
+  totalEmployeeCharges?: number;
+  totalEmployerCharges?: number;
+  overtimeHours?: number;
+  overtimeAmount?: number;
+  benefitsInKind?: number;
+  workingHours?: number;
+  ytdGrossSalary?: number;
+  ytdNetImposable?: number;
+  ytdEmployeeCharges?: number;
+  ytdEmployerCharges?: number;
+  ytdWorkingHours?: number;
 }

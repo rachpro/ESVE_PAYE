@@ -7,7 +7,7 @@
       "properties": {
         "uid": { "type": "string" },
         "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["admin", "user"] },
+        "role": { "type": "string", "enum": ["admin", "editor", "viewer"] },
         "displayName": { "type": "string" }
       },
       "required": ["uid", "email", "role"]
@@ -52,6 +52,10 @@
     "/payrollSlips/{slipId}": {
       "schema": "PayrollSlip",
       "description": "History of generated slips"
+    },
+    "/decharges/{dechargeId}": {
+      "schema": "object",
+      "description": "Decharges history"
     }
   }
 }

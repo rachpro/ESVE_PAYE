@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Company } from '../types';
-import { Building2, MapPin, Hash, Briefcase, Image as ImageIcon, Save, Phone, Mail, FileText, ShieldCheck, Activity, Layers, CreditCard, Trash2 } from 'lucide-react';
+import { Building2, MapPin, Hash, Briefcase, Image as ImageIcon, Save, Phone, Mail, FileText, ShieldCheck, Activity, Layers, CreditCard, Trash2, X } from 'lucide-react';
 
 interface SettingsProps {
   company: Company;
-  onSave: (company: Company) => void;
+  onSave?: (company: Company) => void;
   onReset?: () => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) => {
   const [formData, setFormData] = useState<Company>(company);
+  const isReadOnly = !onSave;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -32,7 +33,7 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) 
       </div>
 
       <form onSubmit={handleSubmit} className="p-8 space-y-6">
-        <div className="space-y-4">
+        <fieldset disabled={isReadOnly} className="space-y-4">
           <div className="space-y-2">
             <label className="text-xs font-semibold uppercase tracking-wider text-[#64748b] flex items-center gap-2">
               <Building2 size={14} />
@@ -43,7 +44,7 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) 
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
+              className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm disabled:bg-gray-50"
               required
             />
           </div>
@@ -87,7 +88,8 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) 
                 name="rccm"
                 value={formData.rccm || ''}
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
+                disabled={isReadOnly}
+                className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm disabled:bg-gray-50"
               />
             </div>
           </div>
@@ -198,58 +200,97 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) 
               <ImageIcon size={14} />
               Logo de l'entreprise
             </label>
-            <div className="flex gap-4 items-center">
-              <div className="flex-1 space-y-2">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-6 p-4 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl">
+                <div className="w-24 h-24 bg-white border border-[#e2e8f0] rounded-xl flex items-center justify-center p-2 shadow-sm relative group overflow-hidden">
+                  {formData.logo ? (
+                    <>
+                      <img 
+                        src={formData.logo} 
+                        alt="Logo Preview" 
+                        className="max-w-full max-h-full object-contain" 
+                        referrerPolicy="no-referrer" 
+                      />
+                      {!isReadOnly && (
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button 
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, logo: '' }))}
+                            className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 shadow-lg"
+                            title="Supprimer le logo"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <ImageIcon size={32} className="text-gray-300" />
+                  )}
+                </div>
+                
+                <div className="flex-1 space-y-3">
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setFormData(prev => ({ ...prev, logo: reader.result as string }));
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                      disabled={isReadOnly}
+                    />
+                    <button 
+                      type="button"
+                      className="w-full px-4 py-2.5 bg-white border border-[#2563eb] text-[#2563eb] rounded-lg font-bold text-sm hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
+                    >
+                      <ImageIcon size={18} />
+                      Choisir une image
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-[#64748b] leading-tight">
+                    Formats supportés : JPG, PNG, SVG. Taille max recommandée : 500kb.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-muted uppercase">Ou via une URL directe</label>
                 <input
                   type="text"
                   name="logo"
                   value={formData.logo || ''}
                   onChange={handleChange}
-                  placeholder="URL de l'image (Ex: https://...)"
-                  className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
+                  placeholder="https://example.com/logo.png"
+                  className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] focus:ring-1 focus:ring-primary outline-none transition-all text-xs"
                 />
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setFormData(prev => ({ ...prev, logo: reader.result as string }));
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="w-full px-4 py-2 bg-[#f8fafc] border border-dashed border-[#cbd5e1] rounded-lg text-sm text-[#64748b] text-center hover:bg-[#f1f5f9] transition-all cursor-pointer">
-                    Ou cliquez ici pour sélectionner un fichier depuis votre PC
-                  </div>
-                </div>
               </div>
-              {formData.logo && (
-                <div className="w-16 h-16 border border-[#e2e8f0] shrink-0 rounded-lg overflow-hidden bg-white flex items-center justify-center p-1 shadow-sm">
-                  <img src={formData.logo} alt="Preview" className="max-w-full max-h-full object-contain" referrerPolicy="no-referrer" />
-                </div>
-              )}
             </div>
-            <p className="text-[10px] text-[#64748b] pt-1">
-              Pour que le logo marche toujours (même sur le bureau), optez pour la sélection d'un fichier.
-            </p>
           </div>
-
-        </div>
+        </fieldset>
 
         <div className="pt-4">
-          <button
-            type="submit"
-            className="w-full bg-[#2563eb] text-white py-3 rounded-lg font-semibold text-sm shadow-sm hover:opacity-90 transition-all flex items-center justify-center gap-2"
-          >
-            <Save size={18} />
-            Enregistrer les modifications
-          </button>
+          {onSave && (
+            <button
+              type="submit"
+              className="w-full bg-[#2563eb] text-white py-3 rounded-lg font-semibold text-sm shadow-sm hover:opacity-90 transition-all flex items-center justify-center gap-2"
+            >
+              <Save size={18} />
+              Enregistrer les modifications
+            </button>
+          )}
+          {isReadOnly && (
+            <div className="p-4 bg-gray-50 border border-gray-100 rounded-lg text-center text-xs text-muted italic">
+              Vous n'avez pas les permissions nécessaires pour modifier les informations de l'entreprise.
+            </div>
+          )}
         </div>
       </form>
 

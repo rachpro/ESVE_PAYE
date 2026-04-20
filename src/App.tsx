@@ -14,10 +14,11 @@ import { DechargeForm } from './components/DechargeForm';
 import { DechargeDocument } from './components/DechargeDocument';
 import { LoginPage } from './components/LoginPage';
 import { TrashBin } from './components/TrashBin';
-import { Employee, PayrollSlipData, Company, Decharge } from './types';
+import { Employee, PayrollSlipData, Company, Decharge, UserRole } from './types';
 import { DEFAULT_COMPANY } from './lib/calculations';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, googleProvider, db } from './firebase';
+import { UserManagement } from './components/UserManagement';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -25,6 +26,7 @@ const MOCK_EMPLOYEES: Employee[] = []; // Resetting data as requested
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>('viewer');
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -107,7 +109,7 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        let role = 'user';
+        let role: UserRole = 'viewer';
         
         // Super Utilisateurs définis en dur (Le créateur et le patron)
         const superUsers = ['konerachid12@gmail.com', 'direction@svequipement.com'];
@@ -118,18 +120,27 @@ export default function App() {
         try {
           const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
           if (userDoc.exists()) {
+            const dbRole = userDoc.data().role as UserRole;
             // S'il existe dans la BDD, on met à jour son rôle (sauf si c'est un super user qui force le role admin)
             if (role !== 'admin') {
-               role = userDoc.data().role;
+               role = dbRole;
             }
           } else {
             // Création automatique du document dans Firestore : on assigne ADMIN par défaut pour ce prototype
-            role = 'admin'; // TOUT NOUVEAU COMPTE EST ADMIN TEMPORAIREMENT POUR FACILITER LES TESTS
+            // Pour faciliter les tests, on laisse admin si c'est le premier utilisateur ou super user
+            if (role !== 'admin') {
+              // Si ce n'est pas un super user, on met Editor pour le premier pour qu'il puisse tester
+              // En prod on mettrait Viewer par défaut. On met Editor pour le moment.
+              role = 'editor'; 
+            }
+
             await setDoc(doc(db, 'users', currentUser.uid), {
               uid: currentUser.uid,
               email: currentUser.email,
               displayName: currentUser.displayName || currentUser.email?.split('@')[0] || 'Utilisateur',
-              role: role
+              role: role,
+              createdAt: new Date().toISOString(),
+              lastLogin: new Date().toISOString()
             });
           }
         } catch (error) {
@@ -137,9 +148,11 @@ export default function App() {
         }
         
         setUser(currentUser);
+        setUserRole(role);
         setIsAdmin(role === 'admin');
       } else {
         setUser(null);
+        setUserRole('viewer');
         setIsAdmin(false);
       }
       setLoading(false);
@@ -350,7 +363,11 @@ export default function App() {
       case 'decharge-preview':
         return currentDecharge ? <DechargeDocument data={currentDecharge} onUpdate={handleUpdateDecharge} /> : null;
       case 'settings':
-        return <Settings company={company} onSave={handleSaveCompany} onReset={handleResetAllData} />;
+        return <Settings 
+          company={company} 
+          onSave={isAdmin || userRole === 'editor' ? handleSaveCompany : undefined} 
+          onReset={isAdmin ? handleResetAllData : undefined} 
+        />;
       case 'preview':
         return currentSlip ? (
           <motion.div
@@ -375,9 +392,9 @@ export default function App() {
         return (
           <EmployeeManagement 
             employees={employees} 
-            onAdd={handleAddEmployee} 
-            onDelete={handleDeleteEmployee} 
-            onUpdate={handleUpdateEmployee} 
+            onAdd={isAdmin || userRole === 'editor' ? handleAddEmployee : undefined} 
+            onDelete={isAdmin || userRole === 'editor' ? handleDeleteEmployee : undefined} 
+            onUpdate={isAdmin || userRole === 'editor' ? handleUpdateEmployee : undefined} 
           />
         );
       case 'history':
@@ -386,12 +403,14 @@ export default function App() {
           dechargeHistory={dechargeHistory}
           onViewSlip={handleViewSlip} 
           onViewDecharge={handleViewDecharge}
-          onDeleteSlip={(id) => handleDeleteSlip(id, false)}
-          onDeleteDecharge={(id) => handleDeleteDecharge(id, false)}
-          onReset={handleResetAllData}
+          onDeleteSlip={isAdmin || userRole === 'editor' ? (id) => handleDeleteSlip(id, false) : undefined}
+          onDeleteDecharge={isAdmin || userRole === 'editor' ? (id) => handleDeleteDecharge(id, false) : undefined}
+          onReset={isAdmin ? handleResetAllData : undefined}
           onDownloadSlip={setDownloadingSlip}
           onDownloadDecharge={setDownloadingDecharge}
         />;
+      case 'users':
+        return isAdmin ? <UserManagement /> : null;
       case 'corbeille':
         return <TrashBin 
           trashedHistory={trashedHistory}
@@ -409,9 +428,9 @@ export default function App() {
           dechargeHistory={dechargeHistory}
           onViewSlip={handleViewSlip} 
           onViewDecharge={handleViewDecharge}
-          onDeleteSlip={(id) => handleDeleteSlip(id, false)}
-          onDeleteDecharge={(id) => handleDeleteDecharge(id, false)}
-          onReset={handleResetAllData}
+          onDeleteSlip={isAdmin || userRole === 'editor' ? (id) => handleDeleteSlip(id, false) : undefined}
+          onDeleteDecharge={isAdmin || userRole === 'editor' ? (id) => handleDeleteDecharge(id, false) : undefined}
+          onReset={isAdmin ? handleResetAllData : undefined}
           onDownloadSlip={setDownloadingSlip}
           onDownloadDecharge={setDownloadingDecharge}
         />;
@@ -420,7 +439,7 @@ export default function App() {
 
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab} company={company}>
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab} company={company} userRole={userRole}>
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}

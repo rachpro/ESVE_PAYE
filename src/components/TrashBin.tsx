@@ -77,7 +77,7 @@ export const TrashBin: React.FC<TrashBinProps> = ({
                 ) : (
                   <>
                     {trashedHistory.map((slip, idx) => (
-                      <tr key={slip.id || idx} className="hover:bg-[#f8fafc] transition-colors group">
+                      <tr key={`slip-${slip.id || idx}-${idx}`} className="hover:bg-[#f8fafc] transition-colors group">
                         <td className="px-6 py-4">
                           <p className="font-semibold text-sm text-[#1e293b]">{slip.employee.lastName} {slip.employee.firstName}</p>
                           <p className="text-xs text-[#64748b]">{slip.employee.position}</p>
@@ -156,7 +156,7 @@ export const TrashBin: React.FC<TrashBinProps> = ({
                 ) : (
                   <>
                     {trashedDecharges.map((decharge, idx) => (
-                      <tr key={decharge.id || idx} className="hover:bg-[#f8fafc] transition-colors group">
+                      <tr key={`dec-${decharge.id || idx}-${idx}`} className="hover:bg-[#f8fafc] transition-colors group">
                         <td className="px-6 py-4">
                           <p className="font-semibold text-sm text-[#1e293b]">{decharge.beneficiaryName}</p>
                           <p className="text-xs text-[#64748b]">{decharge.purpose}</p>
