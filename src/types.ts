@@ -1,3 +1,18 @@
+export interface TemplateConfig {
+  showCategory?: boolean;
+  showSeniority?: boolean;
+  showContractType?: boolean;
+  showSocialSecurity?: boolean;
+  showNiveau?: boolean;
+  showCoefficient?: boolean;
+  showIndice?: boolean;
+  showDepartment?: boolean;
+  showQualification?: boolean;
+  showLeaveInfo?: boolean;
+  primaryColor?: string;
+  slipFooterText?: string;
+}
+
 export interface Company {
   name: string;
   address: string;
@@ -13,6 +28,7 @@ export interface Company {
   division?: string;
   sector?: string;
   cnssEmployer?: string;
+  templateConfig?: TemplateConfig;
 }
 
 export interface Employee {
@@ -37,16 +53,23 @@ export interface Employee {
   qualification?: string;
   workingHours?: number;
   email?: string;
+  transportAllowance?: number;
+  housingAllowance?: number;
+  functionAllowance?: number;
 }
 
 export interface PayrollLine {
   label: string;
-  base?: number;
-  rate?: number;
-  amount: number;
+  nombre?: number | string;
+  base?: number | string;
+  rate?: number | string;
+  amount: number | string;
   type: 'earning' | 'deduction' | 'info';
   category?: 'social' | 'tax' | 'other';
-  employerAmount?: number;
+  employerAmount?: number | string;
+  employerRate?: number | string;
+  calculationMethod?: 'manual' | 'percent_base' | 'percent_gross';
+  subCategory?: 'prime' | 'indemnity' | 'other';
 }
 
 export interface Decharge {
@@ -113,4 +136,5 @@ export interface PayrollSlipData {
   ytdEmployeeCharges?: number;
   ytdEmployerCharges?: number;
   ytdWorkingHours?: number;
+  ytdIncomeTax?: number;
 }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Employee } from '../types';
 import { UserPlus, MapPin, Hash, Briefcase, DollarSign, Clock, Trash2, Edit2, X, Save, AlertTriangle, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatNumeric, parseNumeric } from '../lib/numericUtils';
 
 interface EmployeeManagementProps {
   employees: Employee[];
@@ -15,6 +16,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   const canEdit = !!onAdd && !!onUpdate && !!onDelete;
   const [formData, setFormData] = useState<Partial<Employee>>({
@@ -49,16 +51,28 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
         return newErrors;
       });
     }
-    setFormData(prev => ({ ...prev, [name]: (name === 'baseSalary' || name === 'workingHours') ? (value === '' ? 0 : Number(value)) : value }));
+    setFormData(prev => {
+      let processedValue: any = value;
+      if (name === 'baseSalary' || name === 'workingHours' || name === 'transportAllowance' || name === 'housingAllowance' || name === 'functionAllowance') {
+        const parsedValue = parseNumeric(value);
+        if (parsedValue === '' || !isNaN(Number(parsedValue))) {
+          processedValue = parsedValue === '' ? '' : Number(parsedValue);
+        } else {
+          return prev; // Reject invalid input
+        }
+      }
+      return { ...prev, [name]: processedValue };
+    });
   };
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
+    const currentBaseSalary = formData.baseSalary !== undefined ? Number(parseNumeric(formData.baseSalary)) : 0;
     if (!formData.firstName?.trim()) newErrors.firstName = 'Le prénom est obligatoire';
     if (!formData.lastName?.trim()) newErrors.lastName = 'Le nom est obligatoire';
     if (!formData.position?.trim()) newErrors.position = 'Le poste est obligatoire';
+    if (currentBaseSalary <= 0) newErrors.baseSalary = 'Le salaire de base doit être supérieur à 0';
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Format d\'email invalide';
-    if (!formData.baseSalary || formData.baseSalary <= 0) newErrors.baseSalary = 'Le salaire doit être supérieur à 0';
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -67,7 +81,10 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
+    setShowSaveConfirm(true);
+  };
 
+  const handleFinalSubmit = () => {
     if (editingId) {
       onUpdate({ ...formData, id: editingId } as Employee);
       setEditingId(null);
@@ -84,6 +101,9 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
       cnib: '',
       position: '',
       baseSalary: 0,
+      transportAllowance: 0,
+      housingAllowance: 0,
+      functionAllowance: 0,
       matricule: '',
       hireDate: '',
       category: '',
@@ -98,6 +118,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
       email: ''
     });
     setErrors({});
+    setShowSaveConfirm(false);
   };
 
   const startEdit = (emp: Employee) => {
@@ -162,6 +183,44 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
         )}
       </AnimatePresence>
 
+      {/* Save Confirmation Modal */}
+      <AnimatePresence>
+        {showSaveConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-[#e2e8f0]"
+            >
+              <div className="flex items-center gap-3 text-[#2563eb] mb-4">
+                <div className="p-2 bg-blue-50 rounded-full">
+                  <AlertTriangle size={24} />
+                </div>
+                <h3 className="text-lg font-bold">{editingId ? 'Confirmer la modification' : 'Confirmer l\'enregistrement'}</h3>
+              </div>
+              <p className="text-[#64748b] mb-6">
+                Voulez-vous vraiment {editingId ? 'enregistrer les modifications apportées à' : 'enregistrer les informations de'} <span className="font-bold text-[#1e293b]">{formData.firstName} {formData.lastName}</span> ?
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowSaveConfirm(false)}
+                  className="flex-1 px-4 py-2.5 bg-gray-100 text-[#64748b] rounded-lg font-semibold hover:bg-gray-200 transition-all"
+                >
+                  Annuler
+                </button>
+                <button 
+                  onClick={handleFinalSubmit}
+                  className="flex-1 px-4 py-2.5 bg-[#2563eb] text-white rounded-lg font-semibold hover:opacity-90 transition-all shadow-lg shadow-blue-100"
+                >
+                  Confirmer
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold text-[#1e293b]">Gestion des Employés</h2>
         {!isAdding && onAdd && (
@@ -207,6 +266,22 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
               {errors.lastName && <p className="text-[11px] text-red-500 font-medium italic">{errors.lastName}</p>}
             </div>
             <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Salaire de Base <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                <input 
+                  type="text" 
+                  inputMode="numeric"
+                  name="baseSalary" 
+                  value={formatNumeric(formData.baseSalary)} 
+                  onChange={handleChange} 
+                  className={`w-full pl-9 pr-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.baseSalary ? 'border-red-500 bg-red-50' : 'border-[#e2e8f0]'}`}
+                  placeholder="Ex: 150 000"
+                />
+              </div>
+              {errors.baseSalary && <p className="text-[11px] text-red-500 font-medium italic">{errors.baseSalary}</p>}
+            </div>
+            <div className="space-y-2">
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Poste <span className="text-red-500">*</span></label>
               <input 
                 type="text" 
@@ -217,17 +292,56 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
               />
               {errors.position && <p className="text-[11px] text-red-500 font-medium italic">{errors.position}</p>}
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Salaire de base (FCFA) <span className="text-red-500">*</span></label>
-              <input 
-                type="number" 
-                name="baseSalary" 
-                value={formData.baseSalary ?? 0} 
-                onChange={handleChange} 
-                className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.baseSalary ? 'border-red-500 bg-red-50' : 'border-[#e2e8f0]'}`}
-              />
-              {errors.baseSalary && <p className="text-[11px] text-red-500 font-medium italic">{errors.baseSalary}</p>}
+
+            {/* Indemnities Section */}
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-blue-50/30 rounded-xl border border-blue-100">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-[#2563eb] uppercase tracking-wider">Indemnité de Transport</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300" size={14} />
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    name="transportAllowance" 
+                    value={formatNumeric(formData.transportAllowance)} 
+                    onChange={handleChange} 
+                    className="w-full pl-9 pr-4 py-2 rounded-lg border border-blue-100 focus:ring-2 focus:ring-[#2563eb] outline-none text-sm bg-white"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-[#2563eb] uppercase tracking-wider">Indemnité de Logement</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300" size={14} />
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    name="housingAllowance" 
+                    value={formatNumeric(formData.housingAllowance)} 
+                    onChange={handleChange} 
+                    className="w-full pl-9 pr-4 py-2 rounded-lg border border-blue-100 focus:ring-2 focus:ring-[#2563eb] outline-none text-sm bg-white"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-[#2563eb] uppercase tracking-wider">Indemnité de Fonction</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-300" size={14} />
+                  <input 
+                    type="text" 
+                    inputMode="numeric"
+                    name="functionAllowance" 
+                    value={formatNumeric(formData.functionAllowance)} 
+                    onChange={handleChange} 
+                    className="w-full pl-9 pr-4 py-2 rounded-lg border border-blue-100 focus:ring-2 focus:ring-[#2563eb] outline-none text-sm bg-white"
+                    placeholder="0"
+                  />
+                </div>
+              </div>
             </div>
+
             <div className="space-y-2">
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">N° Matricule</label>
               <input type="text" name="matricule" value={formData.matricule || ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" placeholder="EMP-202X-XXX" />
@@ -286,7 +400,14 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">H. de travail mensuelles</label>
-              <input type="number" name="workingHours" value={formData.workingHours || 173} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
+              <input 
+                type="text" 
+                inputMode="decimal"
+                name="workingHours" 
+                value={formatNumeric(formData.workingHours)} 
+                onChange={handleChange} 
+                className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" 
+              />
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Email (pour le partage)</label>
@@ -337,8 +458,7 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
             <thead>
               <tr className="bg-[#fafafa] text-[#64748b] text-xs font-bold uppercase tracking-wider">
                 <th className="px-6 py-4">Employé</th>
-                <th className="px-6 py-4">Poste</th>
-                <th className="px-6 py-4">Salaire</th>
+                <th className="px-6 py-4">Poste / Salaire</th>
                 <th className="px-6 py-4">CNIB / SS</th>
                 <th className="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -350,9 +470,16 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
                     <div className="font-bold text-[#1e293b]">{emp.firstName} {emp.lastName}</div>
                     <div className="text-xs text-[#64748b]">{emp.email || emp.residence || emp.address}</div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-[#64748b]">{emp.position}</td>
                   <td className="px-6 py-4">
-                    <div className="text-sm font-bold text-[#1e293b]">{emp.baseSalary.toLocaleString()} FCFA</div>
+                    <div className="text-sm font-semibold text-[#1e293b]">{emp.position}</div>
+                    <div className="text-xs font-bold text-[#2563eb]">{formatNumeric(emp.baseSalary)} FCFA</div>
+                    {(emp.transportAllowance || emp.housingAllowance || emp.functionAllowance) && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {emp.transportAllowance ? <span className="text-[9px] bg-blue-50 text-blue-600 px-1 rounded border border-blue-100">T: {formatNumeric(emp.transportAllowance)}</span> : null}
+                        {emp.housingAllowance ? <span className="text-[9px] bg-blue-50 text-blue-600 px-1 rounded border border-blue-100">L: {formatNumeric(emp.housingAllowance)}</span> : null}
+                        {emp.functionAllowance ? <span className="text-[9px] bg-blue-50 text-blue-600 px-1 rounded border border-blue-100">F: {formatNumeric(emp.functionAllowance)}</span> : null}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-xs font-mono text-[#64748b]">CNIB: {emp.cnib || 'N/A'}</div>

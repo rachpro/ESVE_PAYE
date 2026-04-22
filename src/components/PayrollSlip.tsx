@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { PayrollSlipData } from '../types';
 import { Printer, Download, Eye, X } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -124,8 +124,38 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
     }
   };
 
-  const renderSlip = () => (
-    <div className="bg-[#ffffff] p-6 w-full max-w-[210mm] mx-auto min-h-[297mm] font-sans text-[10px] leading-snug text-[#1e293b] flex flex-col shadow-none border-none">
+  const renderSlip = () => {
+    const config = data.company.templateConfig || {
+      showCategory: true,
+      showSeniority: true,
+      showContractType: true,
+      showSocialSecurity: true,
+      showNiveau: true,
+      showCoefficient: true,
+      showIndice: true,
+      showDepartment: false,
+      showQualification: false,
+      showLeaveInfo: true,
+    };
+
+    const visibleFields = [
+      { label: 'Matricule', value: data.employee.matricule || '-', isMono: true },
+      { label: 'Coefficient', value: data.employee.coefficient || '-' },
+      { label: 'Horaire', value: `${(data.employee.workingHours || 173.33).toLocaleString('fr-FR', { minimumFractionDigits: 3 })}` },
+      { label: 'Emploi', value: data.employee.position },
+      { label: 'Convention collective', value: data.convention || 'CCN' },
+    ];
+
+    const extraFields = [
+      { label: 'Nom et Prénoms', value: `${data.employee.lastName} ${data.employee.firstName}`, isBold: true },
+      { label: "Date d'embauche", value: data.employee.hireDate ? new Date(data.employee.hireDate).toLocaleDateString('fr-FR') : '-' },
+      ...(config.showCategory ? [{ label: 'Catégorie / Échelon', value: data.employee.category || '-' }] : []),
+      ...(config.showSeniority ? [{ label: 'Ancienneté', value: data.employee.seniority || '-' }] : []),
+      ...(config.showSocialSecurity ? [{ label: 'N° CNSS salarié', value: data.employee.socialSecurityNumber || '-', isMono: true }] : []),
+    ];
+
+    return (
+    <div className="bg-[#ffffff] p-6 w-full max-w-[210mm] mx-auto min-h-[297mm] font-sans text-[10px] leading-snug text-[#1e293b] flex flex-col shadow-none border-none relative">
       {/* Top Header */}
       <div className="flex justify-between items-start mb-4 border-b-2 border-blue-600 pb-4">
         <div className="w-1/2 space-y-0.5">
@@ -134,6 +164,7 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
             <p className="font-bold">{data.company.address}</p>
             {data.company.phone && <p>Tél: {data.company.phone}</p>}
             <p>RCCM : {data.company.rccm || '-'} | IFU : {data.company.ifu || '-'}</p>
+            <p>N° SIRET : {data.company.siret || '-'} | APE / NAF : {data.company.ape || '-'}</p>
             <p>N° CNSS employeur : {data.company.cnssEmployer || '-'}</p>
           </div>
         </div>
@@ -151,124 +182,152 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
 
       {/* Employee Info Block */}
       <div className="mb-4">
-        <div className="grid grid-cols-2 border-2 border-[#1e293b] rounded-lg overflow-hidden shadow-sm">
-          {/* Row 1 */}
-          <div className="grid grid-cols-2 divide-x-2 divide-[#1e293b] border-b-2 border-[#1e293b]">
-            <div className="p-2 bg-[#f8fafc] font-black text-[#64748b] text-[8px] uppercase flex items-center">Nom et Prénoms</div>
-            <div className="p-2 font-black text-[11px] text-[#1e293b] uppercase flex items-center">{data.employee.lastName} {data.employee.firstName}</div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="border-2 border-[#1e293b] rounded overflow-hidden shadow-sm">
+            {visibleFields.map((field, idx) => (
+              <div key={idx} className={`grid grid-cols-2 divide-x-2 divide-[#1e293b] ${idx < visibleFields.length - 1 ? 'border-b-2 border-[#1e293b]' : ''}`}>
+                <div className="p-1 px-2 bg-[#f8fafc] font-black text-[#64748b] text-[8px] uppercase flex items-center">
+                  {field.label}
+                </div>
+                <div className="p-1 px-2 flex items-center font-bold text-[#1e293b] text-[9px]">
+                  {field.value}
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="grid grid-cols-2 divide-x-2 divide-[#1e293b] border-b-2 border-[#1e293b]">
-            <div className="p-2 bg-[#f8fafc] font-black text-[#64748b] text-[8px] uppercase flex items-center">N° Matricule</div>
-            <div className="p-2 font-mono font-bold text-[10px] text-[#1e293b] flex items-center">{data.employee.matricule || '-'}</div>
-          </div>
-          {/* Row 2 */}
-          <div className="grid grid-cols-2 divide-x-2 divide-[#1e293b] border-b-2 border-[#1e293b]">
-            <div className="p-2 bg-[#f8fafc] font-black text-[#64748b] text-[8px] uppercase">Poste / Fonction</div>
-            <div className="p-2 text-[#1e293b] font-bold leading-tight">{data.employee.position}</div>
-          </div>
-          <div className="grid grid-cols-2 divide-x-2 divide-[#1e293b] border-b-2 border-[#1e293b]">
-            <div className="p-2 bg-[#f8fafc] font-black text-[#64748b] text-[8px] uppercase">Date d'embauche</div>
-            <div className="p-2 text-[#1e293b] font-bold">{data.employee.hireDate ? new Date(data.employee.hireDate).toLocaleDateString('fr-FR') : '-'}</div>
-          </div>
-          {/* Row 3 */}
-          <div className="grid grid-cols-2 divide-x-2 divide-[#1e293b] border-b-2 border-[#1e293b]">
-            <div className="p-2 bg-[#f8fafc] font-black text-[#64748b] text-[8px] uppercase">Catégorie / Échelon</div>
-            <div className="p-2 text-[#1e293b] font-bold">{data.employee.category || '-'}</div>
-          </div>
-          <div className="grid grid-cols-2 divide-x-2 divide-[#1e293b] border-b-2 border-[#1e293b]">
-            <div className="p-2 bg-[#f8fafc] font-black text-[#64748b] text-[8px] uppercase">Ancienneté</div>
-            <div className="p-2 text-[#1e293b] font-bold">{data.employee.seniority || '-'}</div>
-          </div>
-          {/* Row 4 */}
-          <div className="grid grid-cols-2 divide-x-2 divide-[#1e293b]">
-            <div className="p-2 bg-[#f8fafc] font-black text-[#64748b] text-[8px] uppercase font-bold">Type de contrat</div>
-            <div className="p-2 font-black text-[#2563eb] text-[10px]">{data.contractType || 'CDI'}</div>
-          </div>
-          <div className="grid grid-cols-2 divide-x-2 divide-[#1e293b]">
-            <div className="p-2 bg-[#f8fafc] font-black text-[#64748b] text-[8px] uppercase">N° CNSS salarié</div>
-            <div className="p-2 font-mono font-bold text-[#1e293b]">{data.employee.socialSecurityNumber || '-'}</div>
+          <div className="border-2 border-[#1e293b] rounded overflow-hidden shadow-sm">
+            {extraFields.map((field, idx) => (
+              <div key={idx} className={`grid grid-cols-2 divide-x-2 divide-[#1e293b] ${idx < extraFields.length - 1 ? 'border-b-2 border-[#1e293b]' : ''}`}>
+                <div className="p-1 px-2 bg-[#f8fafc] font-black text-[#64748b] text-[8px] uppercase flex items-center">
+                  {field.label}
+                </div>
+                <div className={`p-1 px-2 flex items-center leading-tight ${field.isBold ? 'font-black text-[10px] uppercase text-[#1e293b]' : 'font-bold text-[#1e293b] text-[9px]'}`}>
+                  {field.value}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
         
         {/* Optional Extra Fields & Leave Info (Compact Row) */}
         <div className="mt-2 grid grid-cols-2 gap-2">
           <div className="grid grid-cols-3 gap-1">
-            {data.employee.niveau && <div className="bg-[#f8fafc] border border-[#e2e8f0] p-1.5 rounded text-[8px] font-bold uppercase"><span className="text-[#64748b]">Niveau:</span> {data.employee.niveau}</div>}
-            {data.employee.coefficient && <div className="bg-[#f8fafc] border border-[#e2e8f0] p-1.5 rounded text-[8px] font-bold uppercase"><span className="text-[#64748b]">Coeff:</span> {data.employee.coefficient}</div>}
-            {data.employee.indice && <div className="bg-[#f8fafc] border border-[#e2e8f0] p-1.5 rounded text-[8px] font-bold uppercase"><span className="text-[#64748b]">Indice:</span> {data.employee.indice}</div>}
+            {config.showNiveau && data.employee.niveau && <div className="bg-[#f8fafc] border border-[#e2e8f0] p-1.5 rounded text-[8px] font-bold uppercase"><span className="text-[#64748b]">Niveau:</span> {data.employee.niveau}</div>}
+            {config.showCoefficient && data.employee.coefficient && <div className="bg-[#f8fafc] border border-[#e2e8f0] p-1.5 rounded text-[8px] font-bold uppercase"><span className="text-[#64748b]">Coeff:</span> {data.employee.coefficient}</div>}
+            {config.showIndice && data.employee.indice && <div className="bg-[#f8fafc] border border-[#e2e8f0] p-1.5 rounded text-[8px] font-bold uppercase"><span className="text-[#64748b]">Indice:</span> {data.employee.indice}</div>}
           </div>
-          <div className="bg-blue-50/50 border border-blue-100 rounded px-3 py-1 flex justify-between items-center text-[8px] font-bold text-blue-800">
-            <span>Congés Acquis: {data.leaveAcquired || 2.5}j</span>
-            <span className="w-px h-3 bg-blue-200"></span>
-            <span>Pris: {data.leaveTaken || 0}j</span>
-            <span className="w-px h-3 bg-blue-200"></span>
-            <span className="text-blue-900">Solde: {data.leaveBalance || 22.5}j</span>
-          </div>
+          {config.showLeaveInfo !== false && (
+            <div className="bg-blue-50/50 border border-blue-100 rounded px-3 py-1 flex justify-between items-center text-[8px] font-bold text-blue-800">
+              <span>Congés Acquis: {data.leaveAcquired || 2.5}j</span>
+              <span className="w-px h-3 bg-blue-200"></span>
+              <span>Pris: {data.leaveTaken || 0}j</span>
+              <span className="w-px h-3 bg-blue-200"></span>
+              <span className="text-blue-900">Solde: {data.leaveBalance || 22.5}j</span>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Main Table */}
       <div className="flex-1">
-        <table className="w-full border-2 border-[#1e293b] text-[10px] border-collapse">
-          <thead className="bg-[#1e293b] text-white uppercase font-black text-[8px] tracking-widest">
-            <tr className="divide-x divide-white/20">
-              <th className="p-2 text-left w-[45%]">Désignation des rubriques</th>
-              <th className="p-2 text-right w-20">Base (FCFA)</th>
-              <th className="p-2 text-center w-12">Taux</th>
-              <th className="p-2 text-right w-24">Retenue Sal.</th>
-              <th className="p-2 text-right w-24 border-l border-white/20">Charge Pat.</th>
+        <table className="w-full border-2 border-[#1e293b] text-[9px] border-collapse">
+          <thead className="bg-[#f8fafc] text-[#1e293b] uppercase font-black text-[7px] tracking-tight border-b-2 border-[#1e293b]">
+            <tr className="divide-x divide-[#1e293b]">
+              <th rowSpan={2} className="p-1 px-2 text-left align-middle w-[25%] uppercase">Désignation</th>
+              <th rowSpan={2} className="p-1 px-1 text-center align-middle w-12 border-l-2 border-[#1e293b]">Nombre</th>
+              <th rowSpan={2} className="p-1 px-1 text-right align-middle w-20">Base</th>
+              <th colSpan={3} className="p-1 text-center border-b border-[#1e293b]">Part salariale</th>
+              <th colSpan={3} className="p-1 text-center border-l-2 border-[#1e293b] border-b border-[#1e293b]">Part patronale</th>
+            </tr>
+            <tr className="divide-x divide-[#1e293b]">
+              <th className="p-1 text-center w-12">Taux</th>
+              <th className="p-1 text-right w-20">Gain</th>
+              <th className="p-1 text-right w-20 border-r-2 border-[#1e293b]">Retenue</th>
+              <th className="p-1 text-center w-12">Taux</th>
+              <th className="p-1 text-right w-20">Retenue (+)</th>
+              <th className="p-1 text-right w-20">Retenue (-)</th>
             </tr>
           </thead>
           <tbody>
-            <tr className="bg-[#f8fafc] font-black italic">
-              <td colSpan={5} className="p-1 px-4 border-b-2 border-[#1e293b] text-[#2563eb] text-[10px]">I. RÉMUNÉRATIONS ET PRIMES</td>
-            </tr>
+            {data.lines.filter(l => l.label === "NB Charges").map((line, idx) => (
+              <tr key={`info-${idx}`} className="border-b border-[#1e293b] leading-tight">
+                <td className="p-1 px-2 font-medium">{line.label}</td>
+                <td className="p-1 px-1 text-center font-bold border-l-2 border-[#1e293b]">{line.nombre?.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) || '1,00'}</td>
+                <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b]">{line.base?.toLocaleString() || '0'}</td>
+                <td className="p-1 px-1 text-center text-gray-300 border-l border-[#1e293b]">—</td>
+                <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b]">{line.amount?.toLocaleString() || '0'}</td>
+                <td className="p-1 px-1 text-right text-gray-300 border-l border-[#1e293b] border-r-2">—</td>
+                <td className="p-1 px-1 text-center text-gray-300">—</td>
+                <td className="p-1 px-1 text-right text-gray-300 border-l border-[#1e293b]">—</td>
+                <td className="p-1 px-1 text-right text-gray-300 border-l border-[#1e293b]">—</td>
+              </tr>
+            ))}
+
             {data.lines.filter(l => l.type === 'earning').map((line, idx) => (
-              <tr key={`earning-${idx}`} className="border-b border-[#e2e8f0] hover:bg-blue-50/10">
-                <td className="p-2 pl-6 font-medium">{line.label}</td>
-                <td className="p-2 text-right font-bold">{line.amount.toLocaleString()}</td>
-                <td className="p-2 text-center text-[#94a3b8]">—</td>
-                <td className="p-2 text-right text-[#94a3b8]">—</td>
-                <td className="p-2 text-right border-l border-[#e2e8f0] text-[#94a3b8]">—</td>
-              </tr>
-            ))}
-            <tr className="bg-blue-50 font-black border-b-2 border-[#1e293b]">
-              <td colSpan={1} className="p-2 pl-6 text-[#1e40af] uppercase text-[10px]">SALAIRE BRUT TOTAL :</td>
-              <td colSpan={1} className="p-2 text-right text-[#1e40af] text-[11px]">{data.grossSalary.toLocaleString()}</td>
-              <td colSpan={3}></td>
-            </tr>
-
-            <tr className="bg-[#f8fafc] font-black italic">
-              <td colSpan={5} className="p-1 px-4 border-b-2 border-[#1e293b] text-[#2563eb] text-[10px]">II. COTISATIONS SOCIALES</td>
-            </tr>
-            {data.lines.filter(l => l.type === 'deduction' && l.category === 'social').map((line, idx) => (
-              <tr key={`social-${idx}`} className="border-b border-[#e2e8f0] hover:bg-blue-50/10">
-                <td className="p-2 pl-6 font-medium">{line.label}</td>
-                <td className="p-2 text-right font-bold text-gray-400">{(line.base || line.amount / (line.rate ? line.rate/100 : 1)).toLocaleString()}</td>
-                <td className="p-2 text-center font-black bg-blue-50/20 text-blue-800">{line.rate}%</td>
-                <td className="p-2 text-right font-black text-slate-800">{line.amount.toLocaleString()}</td>
-                <td className="p-2 text-right border-l border-[#e2e8f0] font-bold text-slate-600">{line.employerAmount?.toLocaleString() || '0'}</td>
+              <tr key={`earning-${idx}`} className="border-b border-gray-100 leading-tight">
+                <td className="p-1 px-2 font-medium">{line.label}</td>
+                <td className="p-1 px-1 text-center font-bold border-l-2 border-[#1e293b]">{line.nombre?.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) || '30,00'}</td>
+                <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b]">{line.base?.toLocaleString() || line.amount.toLocaleString()}</td>
+                <td className="p-1 px-1 text-center font-bold border-l border-[#1e293b] line-clamp-1">{line.rate ? line.rate.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) : (line.label.toLowerCase().includes('base') || line.label.toLowerCase().includes('salaire') ? '100,00' : '')}</td>
+                <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b]">{line.amount.toLocaleString()}</td>
+                <td className="p-1 px-1 text-right text-gray-300 border-l border-[#1e293b] border-r-2">—</td>
+                <td className="p-1 px-1 text-center text-gray-400 border-l border-[#1e293b]">—</td>
+                <td className="p-1 px-1 text-right text-gray-300 border-l border-[#1e293b]">—</td>
+                <td className="p-1 px-1 text-right text-gray-300 border-l border-[#1e293b]">—</td>
               </tr>
             ))}
 
-            <tr className="bg-[#f8fafc] font-black italic">
-              <td colSpan={5} className="p-1 px-4 border-b-2 border-[#1e293b] text-[#2563eb] text-[10px]">III. IMPÔT SUR LE REVENU (IUTS)</td>
+            <tr className="bg-white font-bold border-b-2 border-[#1e293b]">
+              <td colSpan={1} className="p-1.5 px-10 text-[9px] uppercase italic text-center">Total Brut</td>
+              <td className="border-l-2 border-[#1e293b]"></td>
+              <td className="border-l border-[#1e293b]"></td>
+              <td className="border-l border-[#1e293b]"></td>
+              <td className="p-1.5 text-right text-[10px] border-l border-[#1e293b] bg-gray-50">{data.grossSalary.toLocaleString()}</td>
+              <td className="border-l border-[#1e293b] border-r-2"></td>
+              <td className="border-l border-[#1e293b]"></td>
+              <td className="border-l border-[#1e293b]"></td>
+              <td className="border-l border-[#1e293b]"></td>
             </tr>
-            {data.lines.filter(l => l.category === 'tax').map((line, idx) => (
-              <tr key={`tax-${idx}`} className="border-b border-[#e2e8f0] hover:bg-blue-50/10">
-                <td className="p-2 pl-6 font-medium">{line.label}</td>
-                <td className="p-2 text-right italic text-gray-400">—</td>
-                <td className="p-2 text-center font-black bg-amber-50/20 text-amber-800">{line.rate}%</td>
-                <td className="p-2 text-right font-black text-slate-800">{line.amount.toLocaleString()}</td>
-                <td className="p-2 text-right border-l border-[#e2e8f0] text-[#94a3b8]">—</td>
+
+            {data.lines.filter(l => l.type === 'deduction' && l.label !== "RETENUE FSP 1%").map((line, idx) => (
+              <tr key={`deduction-${idx}`} className="border-b border-gray-100 leading-tight">
+                <td className="p-1 px-2 font-medium">{line.label}</td>
+                <td className="p-1 px-1 text-center text-gray-300 border-l-2 border-[#1e293b]"></td>
+                <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b]">{line.base?.toLocaleString() || (line.label === "TPA" ? data.grossSalary.toLocaleString() : '')}</td>
+                <td className="p-1 px-1 text-center font-bold border-l border-[#1e293b]">{line.rate ? Number(line.rate).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) : (Number(line.amount) > 0 ? '' : '0,00')}</td>
+                <td className="p-1 px-1 text-right text-gray-300 border-l border-[#1e293b]"></td>
+                <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b] border-r-2">{Number(line.amount) > 0 ? line.amount.toLocaleString() : '0'}</td>
+                <td className="p-1 px-1 text-center font-bold border-l border-[#1e293b]">{line.employerRate ? Number(line.employerRate).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) : ''}</td>
+                <td className="p-1 px-1 text-right text-gray-300 border-l border-[#1e293b]"></td>
+                <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b] text-slate-800">{line.employerAmount?.toLocaleString() || '0'}</td>
               </tr>
             ))}
 
-            <tr className="bg-slate-100 font-black border-t-2 border-[#1e293b]">
-              <td colSpan={3} className="p-2 pl-6 uppercase text-[8px] text-[#1e293b] tracking-widest">Total des retenues et charges</td>
-              <td colSpan={1} className="p-2 text-right text-[10px] text-red-600">{(data.grossSalary - data.netPay).toLocaleString()}</td>
-              <td colSpan={1} className="p-2 text-right border-l border-[#1e293b] font-bold text-slate-600">{(data.totalEmployerCost - data.grossSalary).toLocaleString()}</td>
+            <tr className="bg-white font-bold border-t-2 border-[#1e293b] border-b-2">
+              <td colSpan={1} className="p-1.5 px-10 text-[9px] uppercase italic text-center">Total Cotisations</td>
+              <td className="border-l-2 border-[#1e293b]"></td>
+              <td className="border-l border-[#1e293b]"></td>
+              <td className="border-l border-[#1e293b]"></td>
+              <td className="border-l border-[#1e293b]"></td>
+              <td className="p-1.5 text-right text-[10px] border-l border-[#1e293b] border-r-2 bg-gray-50">{data.lines.filter(l => l.type === 'deduction' && l.label !== "RETENUE FSP 1%").reduce((acc, l) => acc + Number(l.amount), 0).toLocaleString()}</td>
+              <td className="border-l border-[#1e293b]"></td>
+              <td className="border-l border-[#1e293b]"></td>
+              <td className="p-1.5 text-right text-[10px] border-l border-[#1e293b] bg-gray-50">{data.totalEmployerCharges?.toLocaleString()}</td>
             </tr>
+
+            {data.lines.filter(l => l.label === "RETENUE FSP 1%").map((line, idx) => (
+              <tr key={`fsp-${idx}`} className="leading-tight">
+                <td className="p-1 px-2 font-bold uppercase">{line.label}</td>
+                <td className="p-1 px-1 text-center text-gray-300 border-l-2 border-[#1e293b]"></td>
+                <td className="p-1 px-1 text-right border-l border-[#1e293b]"></td>
+                <td className="p-1 px-1 text-center border-l border-[#1e293b]"></td>
+                <td className="p-1 px-1 text-right border-l border-[#1e293b]"></td>
+                <td className="p-1 px-1 text-right font-black border-l border-[#1e293b] border-r-2 text-[10px]">{line.amount.toLocaleString()}</td>
+                <td className="p-1 px-1 text-center border-l border-[#1e293b]"></td>
+                <td className="p-1 px-1 text-right border-l border-[#1e293b]"></td>
+                <td className="p-1 px-1 text-right border-l border-[#1e293b]"></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -297,6 +356,7 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
                 <th className="py-1.5">Net Imposable</th>
                 <th className="py-1.5">Charges Sal.</th>
                 <th className="py-1.5">Charges Pat.</th>
+                <th className="py-1.5">IUTS</th>
                 <th className="py-1.5">Heures Trav.</th>
               </tr>
             </thead>
@@ -307,6 +367,7 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
                 <td className="py-1.5">{data.netImposable?.toLocaleString() || '-'}</td>
                 <td className="py-1.5">{(data.grossSalary - data.netPay).toLocaleString()}</td>
                 <td className="py-1.5">{(data.totalEmployerCost - data.grossSalary).toLocaleString()}</td>
+                <td className="py-1.5">{data.incomeTax.toLocaleString()}</td>
                 <td className="py-1.5">{data.workingHours || '173'}</td>
               </tr>
               <tr className="divide-x-2 divide-[#cbd5e1] border-t-2 border-[#cbd5e1] text-[#1e293b] bg-slate-50 font-black">
@@ -315,6 +376,7 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
                 <td className="py-1.5">{data.ytdNetImposable?.toLocaleString() || '-'}</td>
                 <td className="py-1.5">{data.ytdEmployeeCharges?.toLocaleString() || '-'}</td>
                 <td className="py-1.5">{data.ytdEmployerCharges?.toLocaleString() || '-'}</td>
+                <td className="py-1.5">{data.ytdIncomeTax?.toLocaleString() || '-'}</td>
                 <td className="py-1.5">{data.ytdWorkingHours || '-'}</td>
               </tr>
             </tbody>
@@ -342,13 +404,19 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
       </div>
 
       {/* Footer Legal */}
-      <div className="mt-auto pt-4 border-t-2 border-dashed border-gray-100 flex flex-col items-center">
-        <p className="text-[9px] text-[#94a3b8] italic text-center w-full max-w-lg leading-relaxed font-medium">
+      <div className="mt-auto pt-4 border-t-2 border-dashed border-gray-100 flex flex-col items-center gap-1">
+        {config.slipFooterText ? (
+          <p className="text-[9px] text-[#64748b] text-center w-full max-w-lg leading-relaxed font-bold whitespace-pre-wrap">
+            {config.slipFooterText}
+          </p>
+        ) : null}
+        <p className="text-[8px] text-[#94a3b8] italic text-center w-full max-w-lg leading-relaxed font-medium">
           Ce bulletin de paie doit être conservé sans limitation de durée | Conformément au Code du Travail du Burkina Faso (Loi n°028-2008/AN)
         </p>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-6">

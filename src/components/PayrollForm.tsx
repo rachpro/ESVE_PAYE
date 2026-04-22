@@ -4,6 +4,7 @@ import { calculatePayroll, DEFAULT_COMPANY } from '../lib/calculations';
 import { Calculator, UserPlus, Calendar, DollarSign, Plus, Trash2, AlertCircle, CheckCircle2, Activity, Layers } from 'lucide-react';
 import { PayrollSlipData, PayrollLine } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatNumeric, parseNumeric } from '../lib/numericUtils';
 
 interface PayrollFormProps {
   employees: Employee[];
@@ -25,33 +26,191 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
   const [customLines, setCustomLines] = useState<PayrollLine[]>([]);
   const [convention, setConvention] = useState('Commerce Général');
   const [contractType, setContractType] = useState('CDI');
-  const [leaveAcquired, setLeaveAcquired] = useState(2.5);
-  const [leaveTaken, setLeaveTaken] = useState(0);
-  const [leaveBalance, setLeaveBalance] = useState(22.5);
-  const [nbCharges, setNbCharges] = useState(1);
-  const [netImposable, setNetImposable] = useState(0);
-  const [overtimeHours, setOvertimeHours] = useState(0);
-  const [benefitsInKind, setBenefitsInKind] = useState(0);
-  const [ytdGrossSalary, setYtdGrossSalary] = useState(0);
-  const [ytdNetImposable, setYtdNetImposable] = useState(0);
-  const [ytdEmployeeCharges, setYtdEmployeeCharges] = useState(0);
-  const [ytdEmployerCharges, setYtdEmployerCharges] = useState(0);
-  const [ytdWorkingHours, setYtdWorkingHours] = useState(0);
+  const [seniority, setSeniority] = useState('');
+  const [leaveAcquired, setLeaveAcquired] = useState<number | string>(2.5);
+  const [leaveTaken, setLeaveTaken] = useState<number | string>(0);
+  const [leaveBalance, setLeaveBalance] = useState<number | string>(22.5);
+  const [nbCharges, setNbCharges] = useState<number | string>(1);
+  const [netImposable, setNetImposable] = useState<number | string>(0);
+  const [overtimeHours, setOvertimeHours] = useState<number | string>(0);
+  const [workingDays, setWorkingDays] = useState<number | string>(30);
+  const [benefitsInKind, setBenefitsInKind] = useState<number | string>(0);
+  const [ytdGrossSalary, setYtdGrossSalary] = useState<number | string>(0);
+  const [ytdNetImposable, setYtdNetImposable] = useState<number | string>(0);
+  const [ytdEmployeeCharges, setYtdEmployeeCharges] = useState<number | string>(0);
+  const [ytdEmployerCharges, setYtdEmployerCharges] = useState<number | string>(0);
+  const [ytdWorkingHours, setYtdWorkingHours] = useState<number | string>(0);
+  const [ytdIncomeTax, setYtdIncomeTax] = useState<number | string>(0);
+
+  // Helper for Burkina Faso Payroll Logic (reusable for YTD and month)
+  const computePayrollValues = (gross: number, charges: number) => {
+    const cnssBase = Math.min(gross, 600000);
+    const employeeCNSS = Math.round(cnssBase * 0.055);
+    const employerCNSS = Math.round(cnssBase * (0.035 + 0.055 + 0.07));
+    const tpa = Math.round(gross * 0.03);
+    const fsp = Math.round(gross * 0.01);
+    
+    // IUTS
+    const taxableBase = gross - employeeCNSS;
+    let tax = 0;
+    if (taxableBase > 30000) {
+      if (taxableBase > 30000) tax += (Math.min(taxableBase, 50000) - 30000) * 0.02;
+      if (taxableBase > 50000) tax += (Math.min(taxableBase, 80000) - 50000) * 0.05;
+      if (taxableBase > 80000) tax += (Math.min(taxableBase, 120000) - 80000) * 0.10;
+      if (taxableBase > 120000) tax += (Math.min(taxableBase, 170000) - 120000) * 0.15;
+      if (taxableBase > 170000) tax += (Math.min(taxableBase, 250000) - 170000) * 0.20;
+      if (taxableBase > 250000) tax += (taxableBase - 250000) * 0.25;
+
+      let reductionRate = 0;
+      if (charges === 1) reductionRate = 0.08;
+      else if (charges === 2) reductionRate = 0.10;
+      else if (charges === 3) reductionRate = 0.12;
+      else if (charges >= 4) reductionRate = 0.14;
+      tax = tax * (1 - reductionRate);
+    }
+
+    const incomeTax = Math.round(tax);
+    return {
+      taxableBase,
+      employeeCNSS,
+      employerCNSS,
+      incomeTax,
+      totalEmployeeCharges: employeeCNSS + incomeTax + fsp,
+      totalEmployerCharges: employerCNSS + tpa
+    };
+  };
+
+  const calculateAutomatics = (lines: PayrollLine[], dependents: number) => {
+    // 1st Pass: Simple Earnings and Base salary determination
+    let currentBaseSalary = 0;
+    const initialProcessed = lines.map(line => {
+      if (line.label === "Salaire de Base") currentBaseSalary = Number(line.base) || 0;
+      return { ...line };
+    });
+
+    // 2nd Pass: Handle Bonuses/Indemnities with dynamic methods
+    let grossEarnings = 0;
+    const withBonuses = initialProcessed.map(line => {
+      const newLine = { ...line };
+      if (line.type === 'earning') {
+        if (line.calculationMethod === 'percent_base') {
+          newLine.base = currentBaseSalary;
+          const rateValue = Number(line.rate) || 0;
+          newLine.amount = Math.round(currentBaseSalary * (rateValue / 100));
+        }
+        grossEarnings += (Number(newLine.amount) || 0);
+      }
+      return newLine;
+    });
+
+    // 3rd Pass: Handle percent_gross (needs total gross including all previous)
+    // To simplify and avoid circularity, we calculate percent_gross on the final gross earnings 
+    // of NON-percent_gross lines.
+    const finalEarnings = withBonuses.map(line => {
+      const newLine = { ...line };
+      if (line.type === 'earning' && line.calculationMethod === 'percent_gross') {
+        newLine.base = grossEarnings;
+        const rateValue = Number(line.rate) || 0;
+        newLine.amount = Math.round(grossEarnings * (rateValue / 100));
+        // We don't add to grossEarnings here to avoid circularity if multiple exist
+        // but for a single pass logic, we might need a 4th pass for social.
+      }
+      return newLine;
+    });
+
+    // Final Gross for Social/Tax calculation
+    const totalGross = finalEarnings.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
+    const results = computePayrollValues(totalGross, dependents);
+
+    return finalEarnings.map(line => {
+      const newLine = { ...line };
+
+      // Identify and apply bases/rates dynamically for specific labels (Social/Tax)
+      if (line.label === "Retenue Risques Professionnels") {
+        newLine.category = 'social';
+        newLine.base = Math.min(totalGross, 600000);
+        newLine.rate = 0;
+        newLine.employerRate = 3.5;
+      } else if (line.label === "Retenue Assurances vieillesses") {
+        newLine.category = 'social';
+        newLine.base = Math.min(totalGross, 600000);
+        newLine.rate = 5.5;
+        newLine.employerRate = 5.5;
+      } else if (line.label === "Retenue Prestations Familiales") {
+        newLine.category = 'social';
+        newLine.base = Math.min(totalGross, 600000);
+        newLine.rate = 0;
+        newLine.employerRate = 7.0;
+      } else if (line.label === "TPA") {
+        newLine.category = 'tax';
+        newLine.base = totalGross;
+        newLine.rate = 0;
+        newLine.employerRate = 3.0;
+      } else if (line.label === "RETENUE FSP 1%") {
+        newLine.category = 'tax';
+        newLine.base = totalGross;
+        newLine.rate = 1.0;
+        newLine.employerRate = 0;
+      } else if (line.label === "IUTS") {
+        newLine.category = 'tax';
+        newLine.amount = results.incomeTax;
+        newLine.base = results.taxableBase;
+        newLine.rate = 0; 
+      } else if (line.category === 'social') {
+        newLine.base = Math.min(totalGross, 600000);
+      }
+
+      // Final calculation for Social/Tax (except IUTS which is already set)
+      if (newLine.base !== undefined && (newLine.type === 'deduction' || newLine.type === 'info') && newLine.label !== "IUTS") {
+        if (newLine.rate !== undefined && newLine.rate !== 0) {
+          newLine.amount = Math.round(Number(newLine.base) * (Number(newLine.rate) / 100));
+        }
+        if (newLine.employerRate !== undefined && newLine.employerRate !== 0) {
+          newLine.employerAmount = Math.round(Number(newLine.base) * (Number(newLine.employerRate) / 100));
+        }
+      }
+
+      return newLine;
+    });
+  };
+
+  const handleWorkingDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const s = parseNumeric(e.target.value);
+    if (s === '' || !isNaN(Number(s))) {
+      const val = s === '' ? '' : Number(s);
+      setWorkingDays(val);
+      if (val !== '') {
+        const safeVal = Number(val);
+        // Update all earning lines with the new working days count
+        const updatedLines = customLines.map(line => 
+          line.type === 'earning' && line.label !== "NB Charges" && !line.label.toLowerCase().includes('nb')
+            ? { ...line, nombre: safeVal } 
+            : line
+        );
+        setCustomLines(calculateAutomatics(updatedLines, Number(nbCharges) || 0));
+      }
+    }
+  };
 
   const handleEmployeeChange = (id: string) => {
     setSelectedEmployeeId(id);
     const emp = employees.find(e => e.id === id);
     if (emp) {
-      setCustomLines([
-        { label: "NB Charges", base: 1, rate: 0, amount: 0, type: 'info' },
-        { label: "Salaire de base", base: emp.baseSalary, rate: 100, amount: emp.baseSalary, type: 'earning' },
-        { label: "Indemnité de logement", amount: 0, type: 'earning' },
-        { label: "Indemnité de transport", amount: 0, type: 'earning' },
-        { label: "Indemnité de fonction", amount: 0, type: 'earning' },
-        { label: "Retenue Assurances vieillesses (CNSS)", base: 0, rate: 5.5, amount: 0, employerAmount: 0, type: 'deduction', category: 'social' },
-        { label: "IUTS (Barème progressif)", rate: 0, amount: 0, type: 'deduction', category: 'tax' },
-        { label: "Retenue FSP 1%", rate: 1, amount: 0, type: 'deduction', category: 'tax' }
-      ]);
+      setSeniority(emp.seniority || '');
+      const initialLines: PayrollLine[] = [
+        { label: "NB Charges", nombre: nbCharges, base: 0, rate: 0, amount: 0, type: 'info' },
+        { label: "Salaire de Base", nombre: 30, base: emp.baseSalary, amount: emp.baseSalary, type: 'earning' },
+        { label: "Indemnité de logement", nombre: 30, base: emp.housingAllowance || 0, amount: emp.housingAllowance || 0, type: 'earning' },
+        { label: "Indemnité de transport", nombre: 30, base: emp.transportAllowance || 0, amount: emp.transportAllowance || 0, type: 'earning' },
+        { label: "Indemnité de fonction", nombre: 30, base: emp.functionAllowance || 0, amount: emp.functionAllowance || 0, type: 'earning' },
+        { label: "Retenue Risques Professionnels", base: 0, rate: 0, amount: 0, employerAmount: 0, type: 'deduction', category: 'social' },
+        { label: "Retenue Assurances vieillesses", base: 0, rate: 5.5, amount: 0, employerAmount: 0, type: 'deduction', category: 'social' },
+        { label: "Retenue Prestations Familiales", base: 0, rate: 0, amount: 0, employerAmount: 0, type: 'deduction', category: 'social' },
+        { label: "IUTS", rate: 0, amount: 0, type: 'deduction', category: 'tax' },
+        { label: "TPA", base: 0, rate: 0, employerRate: 3, amount: 0, employerAmount: 0, type: 'deduction', category: 'tax' },
+        { label: "RETENUE FSP 1%", base: 0, rate: 1, amount: 0, type: 'deduction', category: 'tax' }
+      ];
+      setCustomLines(calculateAutomatics(initialLines, Number(nbCharges) || 0));
     }
   };
 
@@ -64,21 +223,97 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
   };
 
   const updateLine = (index: number, field: keyof PayrollLine, value: any) => {
-    const newLines = [...customLines];
-    newLines[index] = { ...newLines[index], [field]: value };
+    let newLines = [...customLines];
     
-    // Auto calculate if it's base * rate
-    if (field === 'base' || field === 'rate') {
+    // Ensure numeric fields don't end up as NaN and handle formatting
+    let safeValue = value;
+    if (field === 'amount' || field === 'base' || field === 'rate' || field === 'employerAmount' || field === 'nombre' || field === 'employerRate') {
+      const parsedValue = typeof value === 'string' ? parseNumeric(value) : value;
+      if (parsedValue === '' || !isNaN(Number(parsedValue))) {
+        if (parsedValue === '') {
+          safeValue = '';
+        } else {
+          const numVal = Number(parsedValue);
+          safeValue = isNaN(numVal) ? 0 : numVal;
+        }
+      } else {
+        return; // Reject invalid input
+      }
+    }
+
+    newLines[index] = { ...newLines[index], [field]: safeValue };
+    
+    // Auto calculate if it's base * rate (manual mode)
+    if (field === 'base' || field === 'rate' || field === 'employerRate' || field === 'calculationMethod') {
       const line = newLines[index];
-      if (line.base !== undefined && line.rate !== undefined && line.rate !== 0) {
-        // If rate is entered as percentage (e.g. 5.5), we should use value/100 if it's used as multiplier
-        // But let's assume they might enter it directly or as multiplier.
-        // In the screenshot, Rate is "5.5 %".
-        line.amount = line.base * (line.rate / 100);
+      if (line.calculationMethod === 'percent_base' || !line.calculationMethod || line.calculationMethod === 'manual') {
+        if (line.base !== undefined) {
+          if (line.rate !== undefined && line.rate !== 0) {
+            line.amount = Math.round(Number(line.base) * (Number(line.rate) / 100));
+          }
+          if (line.employerRate !== undefined && line.employerRate !== 0) {
+            line.employerAmount = Math.round(Number(line.base) * (Number(line.employerRate) / 100));
+          }
+        }
       }
     }
     
+    // Refresh automatics on value changes
+    newLines = calculateAutomatics(newLines, Number(nbCharges) || 0);
     setCustomLines(newLines);
+  };
+
+  const handleNbChargesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const s = parseNumeric(e.target.value);
+    if (s === '' || !isNaN(Number(s))) {
+      const valStr = s;
+      if (valStr === '') {
+        setNbCharges('');
+        return;
+      }
+      const val = Number(valStr);
+      const safeVal = Math.max(0, isNaN(val) ? 0 : val);
+      setNbCharges(safeVal);
+      
+      // Update YTD if gross is present
+      if (ytdGrossSalary) {
+        handleYtdGrossChange(Number(ytdGrossSalary), safeVal);
+      }
+
+      // Update the "NB Charges" line visually if it exists
+      const updatedLines = customLines.map(l => l.label === "NB Charges" ? { ...l, base: safeVal } : l);
+      
+      setCustomLines(calculateAutomatics(updatedLines, safeVal));
+    }
+  };
+
+  const handleYtdGrossChange = (val: number, currentCharges?: number) => {
+    setYtdGrossSalary(val);
+    const chargesToUse = currentCharges !== undefined ? currentCharges : (Number(nbCharges) || 0);
+    if (!val) {
+      setYtdNetImposable(0);
+      setYtdEmployeeCharges(0);
+      setYtdEmployerCharges(0);
+      setYtdIncomeTax(0);
+      return;
+    }
+    const results = computePayrollValues(val, chargesToUse);
+    setYtdNetImposable(results.taxableBase);
+    setYtdEmployeeCharges(results.totalEmployeeCharges);
+    setYtdEmployerCharges(results.totalEmployerCharges);
+    setYtdIncomeTax(results.incomeTax);
+  };
+
+  const handleQuickGrossEntry = (s: string) => {
+    const val = Number(parseNumeric(s));
+    const safeVal = isNaN(val) ? 0 : val;
+    // Automatically set the "Salaire de Base" line to this gross value
+    const newLines = customLines.map(line => 
+      line.label === "Salaire de Base" 
+      ? { ...line, base: safeVal, amount: safeVal, calculationMethod: 'manual' as const } 
+      : line
+    );
+    setCustomLines(calculateAutomatics(newLines, Number(nbCharges) || 0));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -86,43 +321,45 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     const employee = employees.find(e => e.id === selectedEmployeeId);
     if (!employee) return;
 
-    setIsGenerating(true);
+    // We don't set isGenerating here anymore, only in handleConfirm
+    // because this stage is just showing the recap modal.
     
-    const earnings = customLines.filter(l => l.type === 'earning').reduce((acc, l) => acc + l.amount, 0);
-    const deductions = customLines.filter(l => l.type === 'deduction').reduce((acc, l) => acc + l.amount, 0);
-    const empCharges = customLines.reduce((acc, l) => acc + (l.employerAmount || 0), 0);
+    const earnings = customLines.filter(l => l.type === 'earning').reduce((acc, l) => acc + Number(parseNumeric(l.amount || 0)), 0);
+    const deductions = customLines.filter(l => l.type === 'deduction').reduce((acc, l) => acc + Number(parseNumeric(l.amount || 0)), 0);
+    const empCharges = customLines.reduce((acc, l) => acc + Number(parseNumeric(l.employerAmount || 0)), 0);
     const netPay = earnings - deductions;
 
     const slip: PayrollSlipData = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       period,
       paymentDate,
-      employee,
+      employee: { ...employee, seniority },
       company,
       lines: customLines,
       grossSalary: earnings,
       netSocialAmount: earnings,
       netPayBeforeTax: earnings,
-      incomeTax: customLines.filter(l => l.category === 'tax').reduce((acc, l) => acc + l.amount, 0),
+      incomeTax: customLines.filter(l => l.category === 'tax').reduce((acc, l) => acc + Number(parseNumeric(l.amount || 0)), 0),
       netPay: netPay,
       totalEmployerCost: earnings + empCharges,
       convention,
       contractType,
-      leaveAcquired,
-      leaveTaken,
-      leaveBalance,
-      nbCharges,
-      netImposable: netImposable || netPay,
+      leaveAcquired: Number(parseNumeric(leaveAcquired)) || 0,
+      leaveTaken: Number(parseNumeric(leaveTaken)) || 0,
+      leaveBalance: Number(parseNumeric(leaveBalance)) || 0,
+      nbCharges: Number(parseNumeric(nbCharges)) || 0,
+      netImposable: Number(parseNumeric(netImposable)) || netPay,
       totalEmployeeCharges: deductions,
       totalEmployerCharges: empCharges,
-      overtimeHours,
-      benefitsInKind,
+      overtimeHours: Number(parseNumeric(overtimeHours)) || 0,
+      benefitsInKind: Number(parseNumeric(benefitsInKind)) || 0,
       workingHours: employee.workingHours,
-      ytdGrossSalary,
-      ytdNetImposable,
-      ytdEmployeeCharges,
-      ytdEmployerCharges,
-      ytdWorkingHours,
+      ytdGrossSalary: Number(parseNumeric(ytdGrossSalary)) || 0,
+      ytdNetImposable: Number(parseNumeric(ytdNetImposable)) || 0,
+      ytdEmployeeCharges: Number(parseNumeric(ytdEmployeeCharges)) || 0,
+      ytdEmployerCharges: Number(parseNumeric(ytdEmployerCharges)) || 0,
+      ytdWorkingHours: Number(parseNumeric(ytdWorkingHours)) || 0,
+      ytdIncomeTax: Number(parseNumeric(ytdIncomeTax)) || 0,
     };
     
     setPendingSlip(slip);
@@ -132,12 +369,21 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
   const handleConfirm = () => {
     if (!pendingSlip) return;
     setIsGenerating(true);
-    setShowConfirm(false);
 
+    // Use a try-catch to ensure we reset state even if onGenerate fails
     setTimeout(() => {
-      onGenerate(pendingSlip);
-      setIsGenerating(false);
-      setPendingSlip(null);
+      try {
+        onGenerate(pendingSlip);
+        // If onGenerate succeeded, it usually changes the tab at the parent level,
+        // but we still want to clean up local state just in case.
+        setPendingSlip(null);
+        setShowConfirm(false);
+      } catch (error) {
+        console.error("Erreur lors de la génération:", error);
+        alert("Une erreur est survenue lors de la génération du bulletin. Veuillez vérifier les données et réessayer.");
+      } finally {
+        setIsGenerating(false);
+      }
     }, 800);
   };
 
@@ -229,8 +475,23 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
             </select>
           </div>
           <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Ancienneté</label>
+            <input type="text" value={seniority || ''} onChange={(e) => setSeniority(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[#e2e8f0] text-sm" placeholder="Ex: 5 ans" />
+          </div>
+          <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Solde Congés</label>
-            <input type="number" value={leaveBalance ?? 0} onChange={(e) => setLeaveBalance(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-[#e2e8f0] text-sm" />
+            <input 
+              type="text" 
+              inputMode="numeric" 
+              value={formatNumeric(leaveBalance)} 
+              onChange={(e) => {
+                const s = parseNumeric(e.target.value);
+                if (s === '' || !isNaN(Number(s))) {
+                  setLeaveBalance(s === '' ? '' : Number(s));
+                }
+              }} 
+              className="w-full px-3 py-2 rounded-lg border border-[#e2e8f0] text-sm" 
+            />
           </div>
         </div>
 
@@ -240,41 +501,106 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
             <Activity size={14} /> Paramètres optionnels (Modèle Sage)
           </h4>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-[#64748b]">Nombre de Charges</label>
-              <input type="number" value={nbCharges} onChange={(e) => setNbCharges(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+              <input type="text" inputMode="numeric" value={formatNumeric(nbCharges)} onChange={handleNbChargesChange} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-[#64748b]">Nombre de Jours</label>
+              <input type="text" inputMode="decimal" value={formatNumeric(workingDays)} onChange={handleWorkingDaysChange} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-[#64748b]">Heures Sup.</label>
-              <input type="number" value={overtimeHours} onChange={(e) => setOvertimeHours(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+              <input 
+                type="text" 
+                inputMode="decimal" 
+                value={formatNumeric(overtimeHours)} 
+                onChange={(e) => {
+                  const s = parseNumeric(e.target.value);
+                  if (s === '' || !isNaN(Number(s))) {
+                    setOvertimeHours(s === '' ? '' : Number(s));
+                  }
+                }} 
+                className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" 
+              />
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-[#64748b]">Avantages en Nature</label>
-              <input type="number" value={benefitsInKind} onChange={(e) => setBenefitsInKind(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+              <input 
+                type="text" 
+                inputMode="numeric" 
+                value={formatNumeric(benefitsInKind)} 
+                onChange={(e) => {
+                  const s = parseNumeric(e.target.value);
+                  if (s === '' || !isNaN(Number(s))) {
+                    setBenefitsInKind(s === '' ? '' : Number(s));
+                  }
+                }} 
+                className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" 
+              />
             </div>
           </div>
 
-          <div className="space-y-3 pt-2">
+            <div className="space-y-3 pt-2">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border-2 border-blue-200 shadow-sm mb-4">
+              <div className="space-y-1">
+                <label className="text-[11px] font-black uppercase text-blue-800 flex items-center gap-2">
+                  <Calculator size={14} /> Saisie Rapide du Salaire Brut (Mois en cours)
+                </label>
+                <p className="text-[10px] text-blue-600/70 font-medium italic">Remplissez ce champ pour peupler automatiquement la paie du mois</p>
+              </div>
+              <div className="w-48">
+                <input 
+                  type="text" 
+                  inputMode="numeric"
+                  placeholder="Ex: 150 000"
+                  className="w-full px-4 py-2.5 rounded-lg border-2 border-blue-100 bg-blue-50/30 text-blue-900 font-bold outline-none focus:border-blue-400 text-lg tabular-nums"
+                  onChange={(e) => {
+                    const s = parseNumeric(e.target.value);
+                    if (s === '' || !isNaN(Number(s))) {
+                      handleQuickGrossEntry(e.target.value);
+                    }
+                  }}
+                  value={formatNumeric(customLines.find(l => l.label === "Salaire de Base")?.amount || '')}
+                />
+              </div>
+            </div>
+
             <label className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-2">
-              <Layers size={14} /> Cumuls Annuels (Optionnel)
+              <Layers size={14} /> Cumuls Annuels (Automatisés par le Brut saisi)
             </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase text-[#64748b]">Salaire Brut</label>
-                <input type="number" value={ytdGrossSalary} onChange={(e) => setYtdGrossSalary(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+                <input 
+                  type="text" 
+                  inputMode="numeric" 
+                  value={formatNumeric(ytdGrossSalary)} 
+                  onChange={(e) => {
+                    const s = parseNumeric(e.target.value);
+                    if (s === '' || !isNaN(Number(s))) {
+                      handleYtdGrossChange(Number(s));
+                    }
+                  }} 
+                  className="w-full px-3 py-2 rounded-lg border-2 border-orange-200 bg-orange-50/20 text-sm font-bold shadow-sm" 
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase text-[#64748b]">Net Imposable</label>
-                <input type="number" value={ytdNetImposable} onChange={(e) => setYtdNetImposable(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+                <input type="text" value={formatNumeric(ytdNetImposable)} readOnly className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-gray-50 text-sm italic font-medium text-gray-500" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase text-[#64748b]">Charges Sal.</label>
-                <input type="number" value={ytdEmployeeCharges} onChange={(e) => setYtdEmployeeCharges(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+                <input type="text" value={formatNumeric(ytdEmployeeCharges)} readOnly className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-gray-50 text-sm italic font-medium text-gray-500" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase text-[#64748b]">Charges Pat.</label>
-                <input type="number" value={ytdEmployerCharges} onChange={(e) => setYtdEmployerCharges(Number(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
+                <input type="text" value={formatNumeric(ytdEmployerCharges)} readOnly className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-gray-50 text-sm italic font-medium text-gray-500" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase text-[#64748b]">IUTS Cumulé</label>
+                <input type="text" value={formatNumeric(ytdIncomeTax)} readOnly className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-gray-50 text-sm italic font-medium text-gray-500" />
               </div>
             </div>
           </div>
@@ -296,32 +622,78 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="text-[#64748b] font-bold border-b">
-                  <th className="pb-2">Libellé</th>
-                  <th className="pb-2 w-24 text-right">Base</th>
-                  <th className="pb-2 w-16 text-right">Taux %</th>
-                  <th className="pb-2 w-28 text-right">Montant Sal.</th>
-                  <th className="pb-2 w-28 text-right">Charge Pat.</th>
-                  <th className="pb-2 w-8"></th>
+                <tr className="text-[#64748b] font-bold border-b text-[9px]">
+                  <th className="pb-2">Libellé / Mode / Cat.</th>
+                  <th className="pb-2 w-10 text-right">Nb</th>
+                  <th className="pb-2 w-16 text-right">Base</th>
+                  <th className="pb-2 w-12 text-right">Sal.%</th>
+                  <th className="pb-2 w-18 text-right">Montant</th>
+                  <th className="pb-2 w-12 text-right">Pat.%</th>
+                  <th className="pb-2 w-18 text-right">Charge</th>
+                  <th className="pb-2 w-6"></th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {customLines.map((line, idx) => (
                   <tr key={idx} className="hover:bg-gray-50/50">
                     <td className="py-2 pr-2">
-                      <input type="text" value={line.label} onChange={(e) => updateLine(idx, 'label', e.target.value)} className="w-full bg-transparent border-none focus:ring-0 p-0 font-medium" />
+                      <div className="flex flex-col gap-1">
+                        <input type="text" value={line.label} onChange={(e) => updateLine(idx, 'label', e.target.value)} className="w-full bg-transparent border-none focus:ring-0 p-0 font-medium text-xs" />
+                        {line.type === 'earning' && (
+                          <div className="flex gap-1">
+                            <select 
+                              value={line.calculationMethod || 'manual'} 
+                              onChange={(e) => updateLine(idx, 'calculationMethod', e.target.value)}
+                              className="text-[8px] bg-blue-50 border-none rounded px-1 py-0 h-4 text-blue-700 outline-none"
+                            >
+                              <option value="manual">Fixe / Manuel</option>
+                              <option value="percent_base">% Base</option>
+                              <option value="percent_gross">% Brut</option>
+                            </select>
+                            <select 
+                              value={line.subCategory || 'other'} 
+                              onChange={(e) => updateLine(idx, 'subCategory', e.target.value)}
+                              className="text-[8px] bg-green-50 border-none rounded px-1 py-0 h-4 text-green-700 outline-none"
+                            >
+                              <option value="other">Autre</option>
+                              <option value="prime">Prime</option>
+                              <option value="indemnity">Indemnité</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
                     </td>
-                    <td className="py-2 pr-2">
-                      <input type="number" value={line.base || ''} onChange={(e) => updateLine(idx, 'base', Number(e.target.value))} className="w-full bg-white border border-gray-100 rounded px-1 py-1 text-right" />
+                    <td className="py-2 pr-1">
+                      <input type="text" inputMode="numeric" value={formatNumeric(line.nombre || '')} onChange={(e) => updateLine(idx, 'nombre', e.target.value)} className="w-full bg-white border border-gray-100 rounded px-1 py-0.5 text-right text-[10px]" />
                     </td>
-                    <td className="py-2 pr-2">
-                      <input type="number" value={line.rate || ''} onChange={(e) => updateLine(idx, 'rate', Number(e.target.value))} className="w-full bg-white border border-gray-100 rounded px-1 py-1 text-right" />
+                    <td className="py-2 pr-1">
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={formatNumeric(line.base || '')} 
+                        readOnly={line.calculationMethod === 'percent_base' || line.calculationMethod === 'percent_gross'}
+                        onChange={(e) => updateLine(idx, 'base', e.target.value)} 
+                        className={`w-full border border-gray-100 rounded px-1 py-0.5 text-right text-[10px] ${line.calculationMethod && line.calculationMethod !== 'manual' ? 'bg-gray-50 text-gray-400' : 'bg-white'}`} 
+                      />
                     </td>
-                    <td className="py-2 pr-2">
-                      <input type="number" value={line.amount || ''} onChange={(e) => updateLine(idx, 'amount', Number(e.target.value))} className={`w-full bg-white border border-gray-100 rounded px-1 py-1 text-right font-bold ${line.type === 'deduction' ? 'text-red-600' : 'text-green-600'}`} />
+                    <td className="py-2 pr-1">
+                      <input type="text" inputMode="numeric" value={formatNumeric(line.rate || '')} onChange={(e) => updateLine(idx, 'rate', e.target.value)} className="w-full bg-white border border-gray-100 rounded px-1 py-0.5 text-right text-[10px]" />
                     </td>
-                    <td className="py-2 pr-2">
-                      <input type="number" value={line.employerAmount || ''} onChange={(e) => updateLine(idx, 'employerAmount', Number(e.target.value))} className="w-full bg-white border border-gray-100 rounded px-1 py-1 text-right font-bold text-blue-600" />
+                    <td className="py-2 pr-1">
+                      <input 
+                        type="text" 
+                        inputMode="numeric"
+                        value={formatNumeric(line.amount || '')} 
+                        readOnly={line.calculationMethod === 'percent_base' || line.calculationMethod === 'percent_gross'}
+                        onChange={(e) => updateLine(idx, 'amount', e.target.value)} 
+                        className={`w-full border border-gray-100 rounded px-1 py-0.5 text-right font-bold text-[10px] ${line.calculationMethod && line.calculationMethod !== 'manual' ? 'bg-gray-50' : 'bg-white'} ${line.type === 'deduction' ? 'text-red-600' : 'text-green-600'}`} 
+                      />
+                    </td>
+                    <td className="py-2 pr-1">
+                      <input type="text" inputMode="numeric" value={formatNumeric(line.employerRate || '')} onChange={(e) => updateLine(idx, 'employerRate', e.target.value)} className="w-full bg-white border border-gray-100 rounded px-1 py-0.5 text-right text-[10px]" />
+                    </td>
+                    <td className="py-2 pr-1">
+                      <input type="text" inputMode="numeric" value={formatNumeric(line.employerAmount || '')} onChange={(e) => updateLine(idx, 'employerAmount', e.target.value)} className="w-full bg-white border border-gray-100 rounded px-1 py-0.5 text-right font-bold text-[10px] text-blue-600" />
                     </td>
                     <td className="py-2">
                       <button type="button" onClick={() => removeLine(idx)} className="text-red-300 hover:text-red-500">
@@ -370,9 +742,9 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-blue-50"
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-blue-50 flex flex-col max-h-[90vh]"
             >
-              <div className="bg-[#2563eb] p-8 text-white relative">
+              <div className="bg-[#2563eb] p-8 text-white relative shrink-0">
                 <div className="absolute top-0 right-0 p-8 opacity-10">
                   <Calculator size={120} />
                 </div>
@@ -387,7 +759,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
                 </div>
               </div>
               
-              <div className="p-8 space-y-6">
+              <div className="p-8 space-y-6 overflow-y-auto">
                 {/* Employee Header */}
                 <div className="flex items-center gap-4 border-b border-gray-100 pb-6">
                   <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-xl font-black shadow-inner">
@@ -434,7 +806,11 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
                 {/* Action Buttons */}
                 <div className="flex gap-4 pt-2">
                   <button
-                    onClick={() => { setShowConfirm(false); setPendingSlip(null); }}
+                    onClick={() => { 
+                      setShowConfirm(false); 
+                      setPendingSlip(null); 
+                      setIsGenerating(false); // Reset just in case
+                    }}
                     className="flex-1 px-6 py-4 border-2 border-gray-100 rounded-2xl text-sm font-black text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-all uppercase tracking-widest"
                   >
                     Annuler

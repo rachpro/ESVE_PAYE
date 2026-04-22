@@ -1,35 +1,66 @@
-import React, { useState } from 'react';
-import { Company } from '../types';
-import { Building2, MapPin, Hash, Briefcase, Image as ImageIcon, Save, Phone, Mail, FileText, ShieldCheck, Activity, Layers, CreditCard, Trash2, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Company, TemplateConfig } from '../types';
+import { Building2, MapPin, Hash, Briefcase, Image as ImageIcon, Save, Phone, Mail, FileText, ShieldCheck, Activity, Layers, CreditCard, Trash2, X, CheckCircle2 } from 'lucide-react';
 
 interface SettingsProps {
   company: Company;
   onSave?: (company: Company) => void;
+  onAutoSave?: (company: Company) => void;
   onReset?: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) => {
+export const Settings: React.FC<SettingsProps> = ({ company, onSave, onAutoSave, onReset }) => {
   const [formData, setFormData] = useState<Company>(company);
+  const [isSaved, setIsSaved] = useState(false);
   const isReadOnly = !onSave;
+  
+  // Track initial render to prevent auto-saving on mount
+  const isInitialRender = useRef(true);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Auto-save effect
+  useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+
+    if (isReadOnly || !onAutoSave) return;
+
+    const timer = setTimeout(() => {
+      onAutoSave(formData);
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 2000);
+    }, 1000); // 1-second debounce for auto-save
+
+    return () => clearTimeout(timer);
+  }, [formData, isReadOnly, onAutoSave]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    if (onSave) onSave(formData);
   };
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-[#e2e8f0] overflow-hidden max-w-2xl">
-      <div className="p-6 border-b border-[#e2e8f0] bg-[#fafafa]">
-        <h3 className="text-base font-semibold flex items-center gap-2 text-[#1e293b]">
-          <Building2 className="text-[#2563eb]" size={18} />
-          Informations de l'entreprise
-        </h3>
-        <p className="text-sm text-[#64748b] mt-1">Ces informations apparaîtront sur tous les bulletins de paie générés.</p>
+      <div className="p-6 border-b border-[#e2e8f0] bg-[#fafafa] flex justify-between items-center">
+        <div>
+          <h3 className="text-base font-semibold flex items-center gap-2 text-[#1e293b]">
+            <Building2 className="text-[#2563eb]" size={18} />
+            Informations de l'entreprise
+          </h3>
+          <p className="text-sm text-[#64748b] mt-1">Ces informations apparaîtront sur tous les bulletins de paie générés.</p>
+        </div>
+        {isSaved && (
+          <div className="flex items-center gap-1.5 text-emerald-600 text-sm font-medium bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100 animate-in fade-in duration-300">
+            <CheckCircle2 size={16} />
+            Sauvegarde auto.
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="p-8 space-y-6">
@@ -105,6 +136,7 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) 
                 name="regime"
                 value={formData.regime || ''}
                 onChange={handleChange}
+                placeholder="Ex: Réel Simplifié"
                 className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
               />
             </div>
@@ -118,6 +150,7 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) 
                 name="division"
                 value={formData.division || ''}
                 onChange={handleChange}
+                placeholder="Ex: DME de Ouaga II"
                 className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
               />
             </div>
@@ -133,6 +166,7 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) 
               name="rib"
               value={formData.rib || ''}
               onChange={handleChange}
+              placeholder="Ex: BF01 12345 123456789012 12"
               className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
             />
           </div>
@@ -148,19 +182,21 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) 
                   name="siret"
                   value={formData.siret || ''}
                   onChange={handleChange}
+                  placeholder="Ex: 123 456 789 00012"
                   className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-semibold uppercase tracking-wider text-[#64748b] flex items-center gap-2">
                   <Briefcase size={14} />
-                  Code APE (Optionnel)
+                  Code APE / NAF (Optionnel)
                 </label>
                 <input
                   type="text"
                   name="ape"
                   value={formData.ape || ''}
                   onChange={handleChange}
+                  placeholder="Ex: 6201Z"
                   className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm"
                 />
               </div>
@@ -272,6 +308,74 @@ export const Settings: React.FC<SettingsProps> = ({ company, onSave, onReset }) 
                   className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] focus:ring-1 focus:ring-primary outline-none transition-all text-xs"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Template Configuration */}
+          <div className="pt-6 mt-6 border-t border-[#e2e8f0]">
+            <h4 className="text-sm font-semibold flex items-center gap-2 text-[#1e293b] mb-4">
+              <FileText className="text-[#2563eb]" size={16} />
+              Personnalisation du Bulletin de Paie
+            </h4>
+            <p className="text-xs text-[#64748b] mb-4">
+              Cochez ou décochez les champs à afficher dans l'en-tête du bulletin généré :
+            </p>
+            <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-xl border border-[#e2e8f0]">
+              {[
+                { name: 'showDepartment', label: 'Département', default: false },
+                { name: 'showQualification', label: 'Qualification', default: false },
+                { name: 'showCategory', label: 'Catégorie / Échelon', default: true },
+                { name: 'showSeniority', label: 'Ancienneté', default: true },
+                { name: 'showContractType', label: 'Type de contrat', default: true },
+                { name: 'showSocialSecurity', label: 'N° CNSS salarié', default: true },
+                { name: 'showNiveau', label: 'Niveau', default: true },
+                { name: 'showCoefficient', label: 'Coefficient', default: true },
+                { name: 'showIndice', label: 'Indice', default: true },
+                { name: 'showLeaveInfo', label: 'Solde des congés', default: true }
+              ].map(field => (
+                <label key={field.name} className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    name={field.name}
+                    checked={Boolean(formData.templateConfig?.[field.name as keyof TemplateConfig] ?? field.default)}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        templateConfig: {
+                          ...(prev.templateConfig || {}),
+                          [field.name]: e.target.checked
+                        }
+                      }));
+                    }}
+                    disabled={isReadOnly}
+                    className="w-4 h-4 text-[#2563eb] rounded border-gray-300 focus:ring-[#2563eb] disabled:opacity-50 transition-all"
+                  />
+                  <span className="text-sm text-gray-700 group-hover:text-black transition-colors">{field.label}</span>
+                </label>
+              ))}
+            </div>
+            
+            <div className="mt-6 space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#64748b] flex items-center gap-2">
+                <FileText size={14} />
+                Texte de pied de page du bulletin (Notes / Mentions légales)
+              </label>
+              <textarea
+                name="slipFooterText"
+                value={formData.templateConfig?.slipFooterText || ''}
+                onChange={(e) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    templateConfig: {
+                      ...(prev.templateConfig || {}),
+                      slipFooterText: e.target.value
+                    }
+                  }));
+                }}
+                disabled={isReadOnly}
+                placeholder="Ex: Merci de conserver ce bulletin. Tout versement a été effectué par virement bancaire."
+                className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm min-h-[80px] disabled:bg-gray-50 resize-y"
+              />
             </div>
           </div>
         </fieldset>

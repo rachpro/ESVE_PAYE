@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Decharge, Company } from '../types';
 import { FileText, User, Hash, Phone, MapPin, DollarSign, Calendar, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { formatNumeric, parseNumeric } from '../lib/numericUtils';
 
 interface DechargeFormProps {
   company: Company;
@@ -41,7 +42,19 @@ export const DechargeForm: React.FC<DechargeFormProps> = ({ company, onGenerate 
         return newErrors;
       });
     }
-    setFormData(prev => ({ ...prev, [name]: name === 'amount' ? (value === '' ? 0 : Number(value)) : value }));
+    
+    let processedValue: any = value;
+    if (name === 'amount') {
+      const parsedValue = parseNumeric(value);
+      // Only update if it's a valid numeric string or empty (to allow deleting)
+      if (parsedValue === '' || !isNaN(Number(parsedValue))) {
+        processedValue = parsedValue === '' ? '' : Number(parsedValue);
+      } else {
+        return; // Reject invalid input
+      }
+    }
+    
+    setFormData(prev => ({ ...prev, [name]: processedValue }));
   };
 
   const validate = () => {
@@ -176,12 +189,16 @@ export const DechargeForm: React.FC<DechargeFormProps> = ({ company, onGenerate 
                 Montant (FCFA) <span className="text-red-500">*</span>
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 name="amount"
-                value={formData.amount ?? 0}
+                value={formatNumeric(formData.amount)}
                 onChange={handleChange}
                 className={`w-full px-3 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none transition-all text-sm font-bold text-[#1e293b] ${errors.amount ? 'border-red-500 bg-red-50' : 'border-[#e2e8f0]'}`}
               />
+              {errors.amount && (
+                <p className="text-xs text-red-500 font-medium animate-pulse">{errors.amount}</p>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -312,9 +329,9 @@ export const DechargeForm: React.FC<DechargeFormProps> = ({ company, onGenerate 
               initial={{ opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-blue-100"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-blue-100 flex flex-col max-h-[90vh]"
             >
-              <div className="bg-[#1e293b] p-6 text-white flex items-center gap-4">
+              <div className="bg-[#1e293b] p-6 text-white flex items-center gap-4 shrink-0">
                 <div className="bg-white/10 p-3 rounded-full">
                   <AlertCircle size={24} className="text-blue-400" />
                 </div>
@@ -324,7 +341,7 @@ export const DechargeForm: React.FC<DechargeFormProps> = ({ company, onGenerate 
                 </div>
               </div>
               
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-4 overflow-y-auto">
                 <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                   <div className="flex justify-between border-b border-gray-100 pb-2">
                     <span className="text-xs text-gray-500 uppercase font-bold tracking-tight">Bénéficiaire</span>

@@ -21,6 +21,7 @@ import { auth, googleProvider, db } from './firebase';
 import { UserManagement } from './components/UserManagement';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const MOCK_EMPLOYEES: Employee[] = []; // Resetting data as requested
 
@@ -203,6 +204,11 @@ export default function App() {
     setActiveTab('dashboard');
   };
 
+  const handleAutoSaveCompany = (newCompany: Company) => {
+    setCompany(newCompany);
+    localStorage.setItem('company_info', JSON.stringify(newCompany));
+  };
+
   const handleAddEmployee = (emp: Employee) => {
     setEmployees([...employees, emp]);
   };
@@ -264,7 +270,7 @@ export default function App() {
       setHistory(currentHistory => {
         const slipToTrash = currentHistory.find(s => s.id === id);
         if (slipToTrash) {
-          setTrashedHistory(prev => [slipToTrash, ...prev]);
+          setTrashedHistory(prev => prev.some(s => s.id === slipToTrash.id) ? prev : [slipToTrash, ...prev]);
           return currentHistory.filter(s => s.id !== id);
         }
         return currentHistory;
@@ -277,7 +283,7 @@ export default function App() {
     setTrashedHistory(currentTrashed => {
       const slip = currentTrashed.find(s => s.id === id);
       if (slip) {
-        setHistory(prev => [slip, ...prev]);
+        setHistory(prev => prev.some(s => s.id === slip.id) ? prev : [slip, ...prev]);
         return currentTrashed.filter(s => s.id !== id);
       }
       return currentTrashed;
@@ -296,7 +302,7 @@ export default function App() {
       setDechargeHistory(currentHistory => {
         const dechargeToTrash = currentHistory.find(d => d.id === id);
         if (dechargeToTrash) {
-          setTrashedDecharges(prev => [dechargeToTrash, ...prev]);
+          setTrashedDecharges(prev => prev.some(d => d.id === dechargeToTrash.id) ? prev : [dechargeToTrash, ...prev]);
           return currentHistory.filter(d => d.id !== id);
         }
         return currentHistory;
@@ -309,7 +315,7 @@ export default function App() {
     setTrashedDecharges(currentTrashed => {
       const decharge = currentTrashed.find(d => d.id === id);
       if (decharge) {
-        setDechargeHistory(prev => [decharge, ...prev]);
+        setDechargeHistory(prev => prev.some(d => d.id === decharge.id) ? prev : [decharge, ...prev]);
         return currentTrashed.filter(d => d.id !== id);
       }
       return currentTrashed;
@@ -355,27 +361,98 @@ export default function App() {
           onReset={handleResetAllData}
           onDownloadSlip={setDownloadingSlip}
           onDownloadDecharge={setDownloadingDecharge}
+          onNavigateToGenerate={() => setActiveTab('generate')}
         />;
       case 'generate':
         return <PayrollForm employees={employees} company={company} onGenerate={handleGenerate} />;
       case 'decharge':
         return <DechargeForm company={company} onGenerate={handleGenerateDecharge} />;
-      case 'decharge-preview':
-        return currentDecharge ? <DechargeDocument data={currentDecharge} onUpdate={handleUpdateDecharge} /> : null;
+      case 'decharge-preview': {
+        const dIndex = dechargeHistory.findIndex(d => d.id === currentDecharge?.id);
+        const onPreviousDecharge = dIndex > 0 ? () => setCurrentDecharge(dechargeHistory[dIndex - 1]) : undefined;
+        const onNextDecharge = dIndex !== -1 && dIndex < dechargeHistory.length - 1 ? () => setCurrentDecharge(dechargeHistory[dIndex + 1]) : undefined;
+        return currentDecharge ? (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-sm border border-[#e2e8f0]">
+              <button 
+                onClick={() => setActiveTab('dashboard')} 
+                className="flex items-center gap-2 text-[#64748b] hover:text-[#1e293b] font-semibold text-sm transition-colors"
+              >
+                <ArrowLeft size={16} />
+                Retour au tableau de bord
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onPreviousDecharge}
+                  disabled={!onPreviousDecharge}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e2e8f0] text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-[#1e293b] transition-all"
+                >
+                  <ChevronLeft size={16} /> Précédent
+                </button>
+                <div className="text-xs font-bold text-[#94a3b8] px-2">{dIndex + 1} / {dechargeHistory.length}</div>
+                <button
+                  onClick={onNextDecharge}
+                  disabled={!onNextDecharge}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e2e8f0] text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-[#1e293b] transition-all"
+                >
+                  Suivant <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+            <DechargeDocument 
+              data={currentDecharge} 
+              onUpdate={handleUpdateDecharge} 
+            />
+          </motion.div>
+        ) : null;
+      }
       case 'settings':
         return <Settings 
           company={company} 
           onSave={isAdmin || userRole === 'editor' ? handleSaveCompany : undefined} 
+          onAutoSave={isAdmin || userRole === 'editor' ? handleAutoSaveCompany : undefined}
           onReset={isAdmin ? handleResetAllData : undefined} 
         />;
-      case 'preview':
+      case 'preview': {
+        const sIndex = history.findIndex(s => s.id === currentSlip?.id);
+        const onPreviousSlip = sIndex > 0 ? () => setCurrentSlip(history[sIndex - 1]) : undefined;
+        const onNextSlip = sIndex !== -1 && sIndex < history.length - 1 ? () => setCurrentSlip(history[sIndex + 1]) : undefined;
+        
         return currentSlip ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <PayrollSlip data={currentSlip} />
+            <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-sm border border-[#e2e8f0]">
+              <button 
+                onClick={() => setActiveTab('dashboard')} 
+                className="flex items-center gap-2 text-[#64748b] hover:text-[#1e293b] font-semibold text-sm transition-colors"
+              >
+                <ArrowLeft size={16} />
+                Retour au tableau de bord
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={onPreviousSlip}
+                  disabled={!onPreviousSlip}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e2e8f0] text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-[#1e293b] transition-all"
+                >
+                  <ChevronLeft size={16} /> Précédent
+                </button>
+                <div className="text-xs font-bold text-[#94a3b8] px-2">{sIndex + 1} / {history.length}</div>
+                <button
+                  onClick={onNextSlip}
+                  disabled={!onNextSlip}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#e2e8f0] text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 text-[#1e293b] transition-all"
+                >
+                  Suivant <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+            <PayrollSlip 
+              data={currentSlip} 
+            />
           </motion.div>
         ) : (
           <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300">
@@ -388,6 +465,7 @@ export default function App() {
             </button>
           </div>
         );
+      }
       case 'employees':
         return (
           <EmployeeManagement 
@@ -408,6 +486,7 @@ export default function App() {
           onReset={isAdmin ? handleResetAllData : undefined}
           onDownloadSlip={setDownloadingSlip}
           onDownloadDecharge={setDownloadingDecharge}
+          onNavigateToGenerate={() => setActiveTab('generate')}
         />;
       case 'users':
         return isAdmin ? <UserManagement /> : null;
@@ -433,6 +512,7 @@ export default function App() {
           onReset={isAdmin ? handleResetAllData : undefined}
           onDownloadSlip={setDownloadingSlip}
           onDownloadDecharge={setDownloadingDecharge}
+          onNavigateToGenerate={() => setActiveTab('generate')}
         />;
     }
   };

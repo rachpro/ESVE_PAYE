@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { Decharge } from '../types';
 import { Printer, Download, Eye, X, PenTool, Trash2, Save } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'motion/react';
 import SignatureCanvas from 'react-signature-canvas';

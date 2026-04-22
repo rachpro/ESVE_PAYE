@@ -281,8 +281,8 @@ export const UserManagement: React.FC = () => {
                   Annuler
                 </button>
                 <button 
-                  onClick={() => deleteUserRecord(confirmDeleteId)}
-                  disabled={isUpdating || deleteConfirmationInput !== users.find(u => u.uid === confirmDeleteId)?.displayName}
+                  onClick={() => deleteUserRecord(confirmDeleteId!)}
+                  disabled={isUpdating || deleteConfirmationInput.trim().toLowerCase() !== (users.find(u => u.uid === confirmDeleteId)?.displayName || '').trim().toLowerCase()}
                   className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-100 flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
                 >
                   {isUpdating ? <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></div> : 'Supprimer'}
