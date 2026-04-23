@@ -56,6 +56,7 @@ export interface Employee {
   transportAllowance?: number;
   housingAllowance?: number;
   functionAllowance?: number;
+  familyCharges?: number;
 }
 
 export interface PayrollLine {
@@ -109,6 +110,7 @@ export interface PayrollSlipData {
   id: string;
   period: string;
   paymentDate: string;
+  signatureDate?: string;
   employee: Employee;
   company: Company;
   lines: PayrollLine[];

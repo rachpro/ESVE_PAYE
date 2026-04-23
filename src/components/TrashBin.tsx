@@ -57,13 +57,25 @@ export const TrashBin: React.FC<TrashBinProps> = ({
         {/* Trashed Bulletins */}
         <div className="bg-white rounded-xl border border-[#e2e8f0] shadow-sm overflow-hidden flex flex-col">
           <div className="p-5 px-6 border-b border-[#e2e8f0] flex justify-between items-center bg-[#fafafa]">
-            <h3 className="font-bold text-sm text-[#1e293b] flex items-center gap-2 uppercase tracking-tight">
-              <CreditCard size={18} className="text-[#2563eb]" />
-              Bulletins supprimés
-            </h3>
-            <span className="text-xs font-semibold text-[#64748b] bg-[#e2e8f0] py-1 px-2.5 rounded-full">
-              {trashedHistory.length}
-            </span>
+            <div className="flex items-center gap-3">
+              <h3 className="font-bold text-sm text-[#1e293b] flex items-center gap-2 uppercase tracking-tight">
+                <CreditCard size={18} className="text-[#2563eb]" />
+                Bulletins supprimés
+              </h3>
+              <span className="text-xs font-semibold text-[#64748b] bg-[#e2e8f0] py-1 px-2.5 rounded-full">
+                {trashedHistory.length}
+              </span>
+            </div>
+            {onEmptySlips && trashedHistory.length > 0 && (
+              <button
+                onClick={() => setConfirmDelete({ id: 'all', type: 'slip', name: 'TOUS les bulletins de la corbeille' })}
+                className="text-[10px] font-black text-red-500 hover:text-red-700 flex items-center gap-1.5 uppercase transition-colors"
+                title="Vider la corbeille"
+              >
+                <Trash2 size={12} />
+                Vider
+              </button>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -101,7 +113,7 @@ export const TrashBin: React.FC<TrashBinProps> = ({
                                 setConfirmDelete({ 
                                   id: slip.id || '', 
                                   type: 'slip', 
-                                  name: `Bulletin - ${slip.employee.lastName} ${slip.employee.firstName}` 
+                                  name: `${slip.employee.lastName} ${slip.employee.firstName} (${slip.period})` 
                                 });
                               }}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors tooltip-supr"
@@ -113,19 +125,6 @@ export const TrashBin: React.FC<TrashBinProps> = ({
                         </td>
                       </tr>
                     ))}
-                    {onEmptySlips && (
-                      <tr className="bg-red-50/20">
-                        <td colSpan={3} className="p-4 text-center">
-                          <button
-                            onClick={() => setConfirmDelete({ id: 'all', type: 'slip', name: 'TOUS les bulletins de la corbeille' })}
-                            className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center justify-center gap-2 mx-auto uppercase tracking-wide"
-                          >
-                            <Trash2 size={14} />
-                            Vider tous les bulletins
-                          </button>
-                        </td>
-                      </tr>
-                    )}
                   </>
                 )}
               </tbody>
@@ -136,13 +135,25 @@ export const TrashBin: React.FC<TrashBinProps> = ({
         {/* Trashed Decharges */}
         <div className="bg-white rounded-xl border border-[#e2e8f0] shadow-sm overflow-hidden flex flex-col">
           <div className="p-5 px-6 border-b border-[#e2e8f0] flex justify-between items-center bg-[#fafafa]">
-            <h3 className="font-bold text-sm text-[#1e293b] flex items-center gap-2 uppercase tracking-tight">
-              <FileText size={18} className="text-[#2563eb]" />
-              Décharges supprimées
-            </h3>
-            <span className="text-xs font-semibold text-[#64748b] bg-[#e2e8f0] py-1 px-2.5 rounded-full">
-              {trashedDecharges.length}
-            </span>
+            <div className="flex items-center gap-3">
+              <h3 className="font-bold text-sm text-[#1e293b] flex items-center gap-2 uppercase tracking-tight">
+                <FileText size={18} className="text-[#2563eb]" />
+                Décharges supprimées
+              </h3>
+              <span className="text-xs font-semibold text-[#64748b] bg-[#e2e8f0] py-1 px-2.5 rounded-full">
+                {trashedDecharges.length}
+              </span>
+            </div>
+            {onEmptyDecharges && trashedDecharges.length > 0 && (
+              <button
+                onClick={() => setConfirmDelete({ id: 'all', type: 'decharge', name: 'TOUTES les décharges de la corbeille' })}
+                className="text-[10px] font-black text-red-500 hover:text-red-700 flex items-center gap-1.5 uppercase transition-colors"
+                title="Vider la corbeille"
+              >
+                <Trash2 size={12} />
+                Vider
+              </button>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -180,7 +191,7 @@ export const TrashBin: React.FC<TrashBinProps> = ({
                                 setConfirmDelete({ 
                                   id: decharge.id || '', 
                                   type: 'decharge', 
-                                  name: `Décharge - ${decharge.beneficiaryName}` 
+                                  name: `${decharge.beneficiaryName} (${decharge.date})` 
                                 });
                               }}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors tooltip-supr"
@@ -192,19 +203,6 @@ export const TrashBin: React.FC<TrashBinProps> = ({
                         </td>
                       </tr>
                     ))}
-                    {onEmptyDecharges && (
-                      <tr className="bg-red-50/20">
-                        <td colSpan={3} className="p-4 text-center">
-                          <button
-                            onClick={() => setConfirmDelete({ id: 'all', type: 'decharge', name: 'TOUTES les décharges de la corbeille' })}
-                            className="text-xs font-bold text-red-500 hover:text-red-700 flex items-center justify-center gap-2 mx-auto uppercase tracking-wide"
-                          >
-                            <Trash2 size={14} />
-                            Vider toutes les décharges
-                          </button>
-                        </td>
-                      </tr>
-                    )}
                   </>
                 )}
               </tbody>

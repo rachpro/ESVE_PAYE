@@ -19,7 +19,7 @@ import { DEFAULT_COMPANY } from './lib/calculations';
 import { motion, AnimatePresence } from 'motion/react';
 import { auth, googleProvider, db } from './firebase';
 import { UserManagement } from './components/UserManagement';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User, setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, User, setPersistence, browserLocalPersistence, browserSessionPersistence, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -181,6 +181,10 @@ export default function App() {
     await createUserWithEmailAndPassword(auth, email, pass);
   };
 
+  const handlePasswordReset = async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     setActiveTab('dashboard');
@@ -236,6 +240,7 @@ export default function App() {
         onLogin={handleLogin}
         onEmailLogin={handleEmailLogin}
         onEmailRegister={handleEmailRegister}
+        onPasswordReset={handlePasswordReset}
         error={user && !isAdmin ? `Désolé, votre compte n'a pas les droits d'administration pour accéder à ${company.name}.` : null}
         onLogout={user && !isAdmin ? handleLogout : undefined}
       />

@@ -263,12 +263,15 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
               </tr>
             ))}
 
-            {data.lines.filter(l => l.type === 'earning').map((line, idx) => (
-              <tr key={`earning-${idx}`} className="border-b border-gray-100 leading-tight">
+            {data.lines.filter(l => l.type === 'earning' || l.label === "SALAIRE BRUT").map((line, idx) => (
+              <tr key={`${line.label}-${idx}`} className={`border-b leading-tight ${line.label === "SALAIRE BRUT" ? "bg-gray-50 font-black border-t-2 border-b-2 border-[#1e293b]" : "border-gray-100"}`}>
                 <td className="p-1 px-2 font-medium">{line.label}</td>
-                <td className="p-1 px-1 text-center font-bold border-l-2 border-[#1e293b]">{line.nombre?.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) || '30,00'}</td>
-                <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b]">{line.base?.toLocaleString() || line.amount.toLocaleString()}</td>
-                <td className="p-1 px-1 text-center font-bold border-l border-[#1e293b] line-clamp-1">{line.rate ? line.rate.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) : (line.label.toLowerCase().includes('base') || line.label.toLowerCase().includes('salaire') ? '100,00' : '')}</td>
+                <td className="p-1 px-1 text-center font-bold border-l-2 border-[#1e293b]">{line.nombre?.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) || (line.label === "SALAIRE BRUT" ? '' : '30,00')}</td>
+                <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b]">{line.base?.toLocaleString() || (line.label === "SALAIRE BRUT" ? line.amount.toLocaleString() : line.amount.toLocaleString())}</td>
+                <td className="p-1 px-1 text-center font-bold border-l border-[#1e293b] line-clamp-1">
+                  {line.rate ? line.rate.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) : 
+                  (line.label === "SALAIRE BRUT" ? '' : (line.label.toLowerCase().includes('base') || line.label.toLowerCase().includes('salaire') || line.label.toLowerCase().includes('indemnité') ? '3000,00' : ''))}
+                </td>
                 <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b]">{line.amount.toLocaleString()}</td>
                 <td className="p-1 px-1 text-right text-gray-300 border-l border-[#1e293b] border-r-2">—</td>
                 <td className="p-1 px-1 text-center text-gray-400 border-l border-[#1e293b]">—</td>
@@ -277,17 +280,20 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
               </tr>
             ))}
 
-            <tr className="bg-white font-bold border-b-2 border-[#1e293b]">
-              <td colSpan={1} className="p-1.5 px-10 text-[9px] uppercase italic text-center">Total Brut</td>
-              <td className="border-l-2 border-[#1e293b]"></td>
-              <td className="border-l border-[#1e293b]"></td>
-              <td className="border-l border-[#1e293b]"></td>
-              <td className="p-1.5 text-right text-[10px] border-l border-[#1e293b] bg-gray-50">{data.grossSalary.toLocaleString()}</td>
-              <td className="border-l border-[#1e293b] border-r-2"></td>
-              <td className="border-l border-[#1e293b]"></td>
-              <td className="border-l border-[#1e293b]"></td>
-              <td className="border-l border-[#1e293b]"></td>
-            </tr>
+            {/* Removed redundant hardcoded Total Brut row as it's now a dynamic line if present */}
+            {!data.lines.some(l => l.label === "SALAIRE BRUT") && (
+              <tr className="bg-white font-bold border-b-2 border-[#1e293b]">
+                <td colSpan={1} className="p-1.5 px-10 text-[9px] uppercase italic text-center">Total Brut</td>
+                <td className="border-l-2 border-[#1e293b]"></td>
+                <td className="border-l border-[#1e293b]"></td>
+                <td className="border-l border-[#1e293b]"></td>
+                <td className="p-1.5 text-right text-[10px] border-l border-[#1e293b] bg-gray-50">{data.grossSalary.toLocaleString()}</td>
+                <td className="border-l border-[#1e293b] border-r-2"></td>
+                <td className="border-l border-[#1e293b]"></td>
+                <td className="border-l border-[#1e293b]"></td>
+                <td className="border-l border-[#1e293b]"></td>
+              </tr>
+            )}
 
             {data.lines.filter(l => l.type === 'deduction' && l.label !== "RETENUE FSP 1%").map((line, idx) => (
               <tr key={`deduction-${idx}`} className="border-b border-gray-100 leading-tight">
@@ -315,13 +321,14 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
               <td className="p-1.5 text-right text-[10px] border-l border-[#1e293b] bg-gray-50">{data.totalEmployerCharges?.toLocaleString()}</td>
             </tr>
 
+            {/* FSP Section with Sage rendering */}
             {data.lines.filter(l => l.label === "RETENUE FSP 1%").map((line, idx) => (
-              <tr key={`fsp-${idx}`} className="leading-tight">
+              <tr key={`fsp-${idx}`} className="leading-tight border-b-2 border-[#1e293b]">
                 <td className="p-1 px-2 font-bold uppercase">{line.label}</td>
                 <td className="p-1 px-1 text-center text-gray-300 border-l-2 border-[#1e293b]"></td>
-                <td className="p-1 px-1 text-right border-l border-[#1e293b]"></td>
-                <td className="p-1 px-1 text-center border-l border-[#1e293b]"></td>
-                <td className="p-1 px-1 text-right border-l border-[#1e293b]"></td>
+                <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b]">{line.base?.toLocaleString() || (idx === 0 ? data.grossSalary.toLocaleString() : '')}</td>
+                <td className="p-1 px-1 text-center font-bold border-l border-[#1e293b]">{line.rate ? Number(line.rate).toLocaleString('fr-FR', { minimumFractionDigits: 2 }) : '1,00'}</td>
+                <td className="p-1 px-1 text-right text-gray-300 border-l border-[#1e293b]"></td>
                 <td className="p-1 px-1 text-right font-black border-l border-[#1e293b] border-r-2 text-[10px]">{line.amount.toLocaleString()}</td>
                 <td className="p-1 px-1 text-center border-l border-[#1e293b]"></td>
                 <td className="p-1 px-1 text-right border-l border-[#1e293b]"></td>
@@ -332,15 +339,18 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
         </table>
       </div>
 
-      {/* Net Pay Bar (Compact) */}
+      {/* Net Pay Bar (Prominent Styling) */}
       <div className="mt-4">
-        <div className="flex items-stretch rounded-lg overflow-hidden border-4 border-[#2563eb]">
-          <div className="bg-[#2563eb] text-white p-3 flex-1 flex flex-col justify-center">
-            <h4 className="text-lg font-black uppercase tracking-tighter">NET À PAYER AU SALARIÉ</h4>
-            <p className="text-[9px] opacity-80 italic font-bold">Total net après déduction des cotisations et impôts</p>
+        <div className="flex items-stretch rounded-xl overflow-hidden border-8 border-[#1e293b] shadow-xl">
+          <div className="bg-[#1e293b] text-white p-5 flex-1 flex flex-col justify-center">
+            <h4 className="text-xl font-black uppercase tracking-tighter leading-none mb-1">NET À PAYER AU SALARIÉ</h4>
+            <p className="text-[10px] text-blue-400 italic font-bold">Total net après déduction des cotisations et impôts</p>
           </div>
-          <div className="bg-white flex items-center justify-center px-10 border-l-4 border-[#2563eb]">
-            <span className="text-3xl font-black text-[#1e293b] tabular-nums tracking-tighter">{data.netPay.toLocaleString('fr-FR')} <span className="text-xl text-blue-600 ml-1">FCFA</span></span>
+          <div className="bg-blue-600 flex items-center justify-center px-12 border-l-8 border-[#1e293b]">
+            <span className="text-4xl font-black text-white tabular-nums tracking-tighter drop-shadow-md">
+              {data.netPay.toLocaleString('fr-FR')} 
+              <span className="text-xl opacity-80 ml-2">FCFA</span>
+            </span>
           </div>
         </div>
       </div>
@@ -399,7 +409,11 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
             <p className="font-black text-[11px] uppercase tracking-widest text-[#1e293b]">LE SALARIÉ</p>
           </div>
           <p className="text-[8px] text-[#64748b] leading-tight font-bold italic uppercase">Signature précédée de la mention « Lu et approuvé »</p>
-          <div className="h-20 w-full border-b-2 border-[#1e293b] mt-2"></div>
+          <div className="h-20 w-full border-b-2 border-[#1e293b] mt-2 relative">
+            {data.signatureDate && (
+              <span className="absolute bottom-1 left-0 text-[7px] text-gray-400 font-bold">Fait le : {new Date(data.signatureDate).toLocaleDateString('fr-FR')}</span>
+            )}
+          </div>
         </div>
       </div>
 

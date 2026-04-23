@@ -442,6 +442,17 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Résidence</label>
               <input type="text" name="residence" value={formData.residence ?? ''} onChange={handleChange} className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" />
             </div>
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Nombre de charges (Enfants)</label>
+              <input 
+                type="text" 
+                inputMode="numeric"
+                name="familyCharges" 
+                value={formatNumeric(formData.familyCharges)} 
+                onChange={handleChange} 
+                className="w-full px-4 py-2 rounded-lg border border-[#e2e8f0] outline-none focus:ring-2 focus:ring-[#2563eb] text-sm" 
+              />
+            </div>
             <div className="md:col-span-2 pt-4">
               <button type="submit" className="w-full bg-[#2563eb] text-white py-3 rounded-lg font-bold text-sm shadow-sm hover:opacity-90 transition-all flex items-center justify-center gap-2">
                 <Save size={18} />

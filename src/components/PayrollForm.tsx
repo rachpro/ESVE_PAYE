@@ -22,7 +22,9 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     return `${months[now.getMonth()]} ${now.getFullYear()}`;
   });
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [signatureDate, setSignatureDate] = useState(new Date().toISOString().split('T')[0]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [customLines, setCustomLines] = useState<PayrollLine[]>([]);
   const [convention, setConvention] = useState('Commerce Général');
   const [contractType, setContractType] = useState('CDI');
@@ -31,6 +33,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
   const [leaveTaken, setLeaveTaken] = useState<number | string>(0);
   const [leaveBalance, setLeaveBalance] = useState<number | string>(22.5);
   const [nbCharges, setNbCharges] = useState<number | string>(1);
+  const [baseSalary, setBaseSalary] = useState<number | string>(0);
   const [netImposable, setNetImposable] = useState<number | string>(0);
   const [overtimeHours, setOvertimeHours] = useState<number | string>(0);
   const [workingDays, setWorkingDays] = useState<number | string>(30);
@@ -42,39 +45,80 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
   const [ytdWorkingHours, setYtdWorkingHours] = useState<number | string>(0);
   const [ytdIncomeTax, setYtdIncomeTax] = useState<number | string>(0);
 
+  // Check for NaN or Infinity in lines
+  const calculationError = customLines.find(l => {
+    const amt = Number(l.amount);
+    const base = Number(l.base);
+    const empAmt = l.employerAmount !== undefined ? Number(l.employerAmount) : 0;
+    return isNaN(amt) || !isFinite(amt) || isNaN(base) || !isFinite(base) || isNaN(empAmt) || !isFinite(empAmt);
+  });
+
   // Helper for Burkina Faso Payroll Logic (reusable for YTD and month)
   const computePayrollValues = (gross: number, charges: number) => {
-    const cnssBase = Math.min(gross, 600000);
-    const employeeCNSS = Math.round(cnssBase * 0.055);
-    const employerCNSS = Math.round(cnssBase * (0.035 + 0.055 + 0.07));
-    const tpa = Math.round(gross * 0.03);
-    const fsp = Math.round(gross * 0.01);
+    // CNSS is calculated on the total gross per user request
+    const cnssBase = gross;
     
-    // IUTS
-    const taxableBase = gross - employeeCNSS;
+    // Employee deductions
+    const employeeCNSS = Math.round(cnssBase * 0.055); // 5.5% (Vieillesse)
+    
+    // IUTS (Impôt Unique sur les Traitements et Salaires)
+    // Étape A : Déterminer le Net Imposable (Base imposable = Brut - CNSS Salariale)
+    const taxableBase = Math.max(0, gross - employeeCNSS);
     let tax = 0;
+    
+    // Étape B : Application du Barème par tranches (Moteur Sage OHADA)
     if (taxableBase > 30000) {
-      if (taxableBase > 30000) tax += (Math.min(taxableBase, 50000) - 30000) * 0.02;
-      if (taxableBase > 50000) tax += (Math.min(taxableBase, 80000) - 50000) * 0.05;
-      if (taxableBase > 80000) tax += (Math.min(taxableBase, 120000) - 80000) * 0.10;
-      if (taxableBase > 120000) tax += (Math.min(taxableBase, 170000) - 120000) * 0.15;
-      if (taxableBase > 170000) tax += (Math.min(taxableBase, 250000) - 170000) * 0.20;
-      if (taxableBase > 250000) tax += (taxableBase - 250000) * 0.25;
-
-      let reductionRate = 0;
-      if (charges === 1) reductionRate = 0.08;
-      else if (charges === 2) reductionRate = 0.10;
-      else if (charges === 3) reductionRate = 0.12;
-      else if (charges >= 4) reductionRate = 0.14;
-      tax = tax * (1 - reductionRate);
+      // 30,000 à 50,000 : 12.1%
+      tax += (Math.min(taxableBase, 50000) - 30000) * 0.121;
+      if (taxableBase > 50000) {
+        // 50,000 à 80,000 : 13.9%
+        tax += (Math.min(taxableBase, 80000) - 50000) * 0.139;
+        if (taxableBase > 80000) {
+          // 80,000 à 120,000 : 15.7%
+          tax += (Math.min(taxableBase, 120000) - 80000) * 0.157;
+          if (taxableBase > 120000) {
+            // 120,000 à 170,000 : 18.4%
+            tax += (Math.min(taxableBase, 170000) - 120000) * 0.184;
+            if (taxableBase > 170000) {
+              // 170,000 à 250,000 : 21.7%
+              tax += (Math.min(taxableBase, 250000) - 170000) * 0.217;
+              if (taxableBase > 250000) {
+                // Au-dessus de 250,000 : 25% (sur le reste)
+                tax += (taxableBase - 250000) * 0.25;
+              }
+            }
+          }
+        }
+      }
     }
 
-    const incomeTax = Math.round(tax);
+    // Étape C : Tableau des réductions (Charges de famille)
+    let reductionRate = 0;
+    const numCharges = Number(charges);
+    if (numCharges === 1) reductionRate = 0.08;
+    else if (numCharges === 2) reductionRate = 0.10;
+    else if (numCharges === 3) reductionRate = 0.12;
+    else if (numCharges >= 4) reductionRate = 0.14;
+    
+    const incomeTax = Math.round(tax * (1 - reductionRate));
+
+    // FSP Calculation: 1% of the Net before FSP
+    const netBeforeFSP = gross - employeeCNSS - incomeTax;
+    const fsp = Math.max(0, Math.round(netBeforeFSP * 0.01));
+    
+    // Employer charges (according to Sage OHADA logic)
+    const employerRisques = Math.round(cnssBase * 0.035); // 3.5%
+    const employerVieillesse = Math.round(cnssBase * 0.055); // 5.5%
+    const employerFamille = Math.round(cnssBase * 0.07); // 7.0%
+    const employerCNSS = employerRisques + employerVieillesse + employerFamille;
+    const tpa = Math.round(gross * 0.03); // 3.0% (Taxe Patronale d'Apprentissage)
+    
     return {
       taxableBase,
       employeeCNSS,
       employerCNSS,
       incomeTax,
+      fsp,
       totalEmployeeCharges: employeeCNSS + incomeTax + fsp,
       totalEmployerCharges: employerCNSS + tpa
     };
@@ -84,8 +128,24 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     // 1st Pass: Simple Earnings and Base salary determination
     let currentBaseSalary = 0;
     const initialProcessed = lines.map(line => {
+      const newLine = { ...line };
       if (line.label === "Salaire de Base") currentBaseSalary = Number(line.base) || 0;
-      return { ...line };
+      
+      // Overtime calculation: (Base Salary / 173.33) * (Rate / 100) * Number
+      if (line.label === "Heures Supplémentaires" && currentBaseSalary > 0) {
+        const hourlyRate = currentBaseSalary / 173.33;
+        const coef = (Number(line.rate) || 125) / 100;
+        const hours = Number(line.nombre) || 0;
+        newLine.base = Math.round(hourlyRate);
+        newLine.amount = Math.round(hourlyRate * coef * hours);
+      } else if (line.type === 'earning' && line.nombre !== undefined && line.label !== "NB Charges" && !line.label.toLowerCase().includes('nb') && line.label !== "Heures Supplémentaires") {
+        // Pro-rata calculation for earnings based on working days (nombre)
+        const base = Number(line.base) || 0;
+        const nombre = Number(line.nombre) || 0;
+        newLine.amount = Math.round(base * (nombre / 30));
+      }
+      
+      return newLine;
     });
 
     // 2nd Pass: Handle Bonuses/Indemnities with dynamic methods
@@ -124,6 +184,12 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
 
     return finalEarnings.map(line => {
       const newLine = { ...line };
+      
+      if (line.label === "SALAIRE BRUT") {
+        newLine.amount = totalGross;
+        newLine.base = totalGross;
+        return newLine;
+      }
 
       // Identify and apply bases/rates dynamically for specific labels (Social/Tax)
       if (line.label === "Retenue Risques Professionnels") {
@@ -148,8 +214,9 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
         newLine.employerRate = 3.0;
       } else if (line.label === "RETENUE FSP 1%") {
         newLine.category = 'tax';
-        newLine.base = totalGross;
+        newLine.base = totalGross - results.employeeCNSS - results.incomeTax;
         newLine.rate = 1.0;
+        newLine.amount = results.fsp;
         newLine.employerRate = 0;
       } else if (line.label === "IUTS") {
         newLine.category = 'tax';
@@ -160,8 +227,8 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
         newLine.base = Math.min(totalGross, 600000);
       }
 
-      // Final calculation for Social/Tax (except IUTS which is already set)
-      if (newLine.base !== undefined && (newLine.type === 'deduction' || newLine.type === 'info') && newLine.label !== "IUTS") {
+      // Final calculation for Social/Tax (except IUTS/FSP which are already set)
+      if (newLine.base !== undefined && (newLine.type === 'deduction' || newLine.type === 'info') && newLine.label !== "IUTS" && newLine.label !== "RETENUE FSP 1%") {
         if (newLine.rate !== undefined && newLine.rate !== 0) {
           newLine.amount = Math.round(Number(newLine.base) * (Number(newLine.rate) / 100));
         }
@@ -177,18 +244,53 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
   const handleWorkingDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const s = parseNumeric(e.target.value);
     if (s === '' || !isNaN(Number(s))) {
-      const val = s === '' ? '' : Number(s);
-      setWorkingDays(val);
-      if (val !== '') {
-        const safeVal = Number(val);
-        // Update all earning lines with the new working days count
-        const updatedLines = customLines.map(line => 
-          line.type === 'earning' && line.label !== "NB Charges" && !line.label.toLowerCase().includes('nb')
-            ? { ...line, nombre: safeVal } 
-            : line
-        );
-        setCustomLines(calculateAutomatics(updatedLines, Number(nbCharges) || 0));
-      }
+      const val = s === '' ? 0 : Number(s);
+      const safeVal = Math.max(0, val);
+      setWorkingDays(s === '' ? '' : safeVal);
+      
+      // Update all earning lines with the new working days count
+      // and recalculate amount based on pro-rata (nombre / 30)
+      const updatedLines = customLines.map(line => {
+        if (line.type === 'earning' && line.label !== "NB Charges" && !line.label.toLowerCase().includes('nb') && line.label !== "Heures Supplémentaires") {
+          const base = Number(line.base) || Number(line.amount) || 0;
+          const newAmount = Math.round(base * (safeVal / 30));
+          return { ...line, nombre: safeVal, amount: newAmount, base: base };
+        }
+        return line;
+      });
+      setCustomLines(calculateAutomatics(updatedLines, Number(nbCharges) || 0));
+    }
+  };
+
+  const handleOvertimeHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const s = parseNumeric(e.target.value);
+    if (s === '' || !isNaN(Number(s))) {
+      const val = s === '' ? 0 : Number(s);
+      setOvertimeHours(s === '' ? '' : val);
+      
+      const updatedLines = customLines.map(line => {
+        if (line.label === "Heures Supplémentaires") {
+          return { ...line, nombre: val };
+        }
+        return line;
+      });
+      setCustomLines(calculateAutomatics(updatedLines, Number(nbCharges) || 0));
+    }
+  };
+
+  const handleBaseSalaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const s = parseNumeric(e.target.value);
+    if (s === '' || !isNaN(Number(s))) {
+      const val = s === '' ? 0 : Number(s);
+      setBaseSalary(s === '' ? '' : val);
+      
+      const updatedLines = customLines.map(line => {
+        if (line.label === "Salaire de Base") {
+          return { ...line, base: val, amount: val };
+        }
+        return line;
+      });
+      setCustomLines(calculateAutomatics(updatedLines, Number(nbCharges) || 0));
     }
   };
 
@@ -197,12 +299,17 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     const emp = employees.find(e => e.id === id);
     if (emp) {
       setSeniority(emp.seniority || '');
+      setBaseSalary(emp.baseSalary || 0);
+      const charges = emp.familyCharges || 0;
+      setNbCharges(charges);
       const initialLines: PayrollLine[] = [
-        { label: "NB Charges", nombre: nbCharges, base: 0, rate: 0, amount: 0, type: 'info' },
-        { label: "Salaire de Base", nombre: 30, base: emp.baseSalary, amount: emp.baseSalary, type: 'earning' },
-        { label: "Indemnité de logement", nombre: 30, base: emp.housingAllowance || 0, amount: emp.housingAllowance || 0, type: 'earning' },
-        { label: "Indemnité de transport", nombre: 30, base: emp.transportAllowance || 0, amount: emp.transportAllowance || 0, type: 'earning' },
+        { label: "NB Charges", nombre: charges, base: 0, rate: 0, amount: 0, type: 'info' },
+        { label: "Salaire de Base", nombre: 30, base: emp.baseSalary, rate: 3000, amount: emp.baseSalary, type: 'earning' },
+        { label: "Indemnité de logement", nombre: 30, base: emp.housingAllowance || 0, rate: 3000, amount: emp.housingAllowance || 0, type: 'earning' },
+        { label: "Indemnité de transport", nombre: 30, base: emp.transportAllowance || 0, rate: 3000, amount: emp.transportAllowance || 0, type: 'earning' },
         { label: "Indemnité de fonction", nombre: 30, base: emp.functionAllowance || 0, amount: emp.functionAllowance || 0, type: 'earning' },
+        { label: "Heures Supplémentaires", nombre: 0, base: 0, rate: 125, amount: 0, type: 'earning' },
+        { label: "SALAIRE BRUT", base: 0, amount: 0, type: 'info' },
         { label: "Retenue Risques Professionnels", base: 0, rate: 0, amount: 0, employerAmount: 0, type: 'deduction', category: 'social' },
         { label: "Retenue Assurances vieillesses", base: 0, rate: 5.5, amount: 0, employerAmount: 0, type: 'deduction', category: 'social' },
         { label: "Retenue Prestations Familiales", base: 0, rate: 0, amount: 0, employerAmount: 0, type: 'deduction', category: 'social' },
@@ -210,16 +317,19 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
         { label: "TPA", base: 0, rate: 0, employerRate: 3, amount: 0, employerAmount: 0, type: 'deduction', category: 'tax' },
         { label: "RETENUE FSP 1%", base: 0, rate: 1, amount: 0, type: 'deduction', category: 'tax' }
       ];
-      setCustomLines(calculateAutomatics(initialLines, Number(nbCharges) || 0));
+      setCustomLines(calculateAutomatics(initialLines, charges));
     }
   };
 
   const addLine = (type: 'earning' | 'deduction') => {
-    setCustomLines([...customLines, { label: "Nouveau libellé", amount: 0, type, base: 0, rate: 0, employerAmount: 0 }]);
+    const newLine: PayrollLine = { label: "Nouveau libellé", amount: 0, type, base: 0, rate: 0, employerAmount: 0 };
+    const newLines = [...customLines, newLine];
+    setCustomLines(calculateAutomatics(newLines, Number(nbCharges) || 0));
   };
 
   const removeLine = (index: number) => {
-    setCustomLines(customLines.filter((_, i) => i !== index));
+    const newLines = customLines.filter((_, i) => i !== index);
+    setCustomLines(calculateAutomatics(newLines, Number(nbCharges) || 0));
   };
 
   const updateLine = (index: number, field: keyof PayrollLine, value: any) => {
@@ -266,14 +376,9 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
   const handleNbChargesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const s = parseNumeric(e.target.value);
     if (s === '' || !isNaN(Number(s))) {
-      const valStr = s;
-      if (valStr === '') {
-        setNbCharges('');
-        return;
-      }
-      const val = Number(valStr);
-      const safeVal = Math.max(0, isNaN(val) ? 0 : val);
-      setNbCharges(safeVal);
+      const val = s === '' ? 0 : Number(s);
+      const safeVal = Math.max(0, val);
+      setNbCharges(s === '' ? '' : safeVal);
       
       // Update YTD if gross is present
       if (ytdGrossSalary) {
@@ -304,10 +409,11 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     setYtdIncomeTax(results.incomeTax);
   };
 
-  const handleQuickGrossEntry = (s: string) => {
+  const handleQuickBaseSalaryEntry = (s: string) => {
     const val = Number(parseNumeric(s));
     const safeVal = isNaN(val) ? 0 : val;
-    // Automatically set the "Salaire de Base" line to this gross value
+    setBaseSalary(safeVal);
+    // Automatically set the "Salaire de Base" line to this value
     const newLines = customLines.map(line => 
       line.label === "Salaire de Base" 
       ? { ...line, base: safeVal, amount: safeVal, calculationMethod: 'manual' as const } 
@@ -321,6 +427,21 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     const employee = employees.find(e => e.id === selectedEmployeeId);
     if (!employee) return;
 
+    // Validations
+    const newErrors: Record<string, string> = {};
+    if (!signatureDate) {
+      newErrors.signatureDate = "La date de signature est obligatoire.";
+    }
+    if (signatureDate && paymentDate && new Date(paymentDate) < new Date(signatureDate)) {
+      newErrors.paymentDate = "La date de paiement doit être supérieure ou égale à la date de signature.";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    setErrors({});
+
     // We don't set isGenerating here anymore, only in handleConfirm
     // because this stage is just showing the recap modal.
     
@@ -333,6 +454,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       period,
       paymentDate,
+      signatureDate,
       employee: { ...employee, seniority },
       company,
       lines: customLines,
@@ -453,7 +575,29 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Date de paiement</label>
-            <input type="date" value={paymentDate || ''} onChange={(e) => setPaymentDate(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-[#e2e8f0] text-sm" />
+            <input 
+              type="date" 
+              value={paymentDate || ''} 
+              onChange={(e) => {
+                setPaymentDate(e.target.value);
+                if (errors.paymentDate) setErrors(prev => ({ ...prev, paymentDate: '' }));
+              }} 
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${errors.paymentDate ? 'border-red-500 bg-red-50 focus:ring-red-200' : 'border-[#e2e8f0]'}`} 
+            />
+            {errors.paymentDate && <p className="text-[10px] text-red-500 font-bold italic">{errors.paymentDate}</p>}
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Date de signature bénéficiaire <span className="text-red-500">*</span></label>
+            <input 
+              type="date" 
+              value={signatureDate || ''} 
+              onChange={(e) => {
+                setSignatureDate(e.target.value);
+                if (errors.signatureDate) setErrors(prev => ({ ...prev, signatureDate: '' }));
+              }} 
+              className={`w-full px-3 py-2 rounded-lg border text-sm ${errors.signatureDate ? 'border-red-500 bg-red-50 focus:ring-red-200' : 'border-[#e2e8f0]'}`} 
+            />
+            {errors.signatureDate && <p className="text-[10px] text-red-500 font-bold italic">{errors.signatureDate}</p>}
           </div>
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-wider text-[#64748b]">Convention collective</label>
@@ -501,7 +645,25 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
             <Activity size={14} /> Paramètres optionnels (Modèle Sage)
           </h4>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-[#64748b] flex items-center gap-1">
+                Salaire de Base
+                <div className="group relative">
+                  <AlertCircle size={10} className="text-blue-400 cursor-help" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-white text-[9px] rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                    Le montant fixe contractuel avant primes et indemnités.
+                  </div>
+                </div>
+              </label>
+              <input 
+                type="text" 
+                inputMode="numeric" 
+                value={formatNumeric(baseSalary)} 
+                onChange={handleBaseSalaryChange} 
+                className="w-full px-3 py-2 rounded-lg border border-blue-200 bg-blue-50/20 text-sm font-bold text-blue-900" 
+              />
+            </div>
             <div className="space-y-2">
               <label className="text-[10px] font-bold uppercase text-[#64748b]">Nombre de Charges</label>
               <input type="text" inputMode="numeric" value={formatNumeric(nbCharges)} onChange={handleNbChargesChange} className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" />
@@ -516,12 +678,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
                 type="text" 
                 inputMode="decimal" 
                 value={formatNumeric(overtimeHours)} 
-                onChange={(e) => {
-                  const s = parseNumeric(e.target.value);
-                  if (s === '' || !isNaN(Number(s))) {
-                    setOvertimeHours(s === '' ? '' : Number(s));
-                  }
-                }} 
+                onChange={handleOvertimeHoursChange} 
                 className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" 
               />
             </div>
@@ -534,7 +691,11 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
                 onChange={(e) => {
                   const s = parseNumeric(e.target.value);
                   if (s === '' || !isNaN(Number(s))) {
-                    setBenefitsInKind(s === '' ? '' : Number(s));
+                    const val = s === '' ? 0 : Number(s);
+                    setBenefitsInKind(s === '' ? '' : val);
+                    // Although benefitsInKind isn't currently a line, refreshing ensures 
+                    // that if logic is added to include it in taxable gross, it updates.
+                    setCustomLines(calculateAutomatics([...customLines], Number(nbCharges) || 0));
                   }
                 }} 
                 className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" 
@@ -546,9 +707,9 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
             <div className="flex justify-between items-center bg-white p-4 rounded-xl border-2 border-blue-200 shadow-sm mb-4">
               <div className="space-y-1">
                 <label className="text-[11px] font-black uppercase text-blue-800 flex items-center gap-2">
-                  <Calculator size={14} /> Saisie Rapide du Salaire Brut (Mois en cours)
+                  <Calculator size={14} /> Saisie Rapide du Salaire de Base
                 </label>
-                <p className="text-[10px] text-blue-600/70 font-medium italic">Remplissez ce champ pour peupler automatiquement la paie du mois</p>
+                <p className="text-[10px] text-blue-600/70 font-medium italic">Ce montant mettra à jour la rubrique de base et recalculera les indemnités liées.</p>
               </div>
               <div className="w-48">
                 <input 
@@ -559,20 +720,35 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
                   onChange={(e) => {
                     const s = parseNumeric(e.target.value);
                     if (s === '' || !isNaN(Number(s))) {
-                      handleQuickGrossEntry(e.target.value);
+                      handleQuickBaseSalaryEntry(e.target.value);
                     }
                   }}
-                  value={formatNumeric(customLines.find(l => l.label === "Salaire de Base")?.amount || '')}
+                  value={formatNumeric(baseSalary)}
                 />
               </div>
             </div>
 
+            <div className="flex justify-between items-center bg-green-50 p-4 rounded-xl border-2 border-green-200 shadow-sm mb-4">
+              <div className="space-y-1">
+                <label className="text-[11px] font-black uppercase text-green-800 flex items-center gap-2">
+                  <DollarSign size={14} /> Total Salaire Brut (Mois en cours)
+                </label>
+                <p className="text-[10px] text-green-600/70 font-medium italic">Somme de toutes les rubriques de gain (Base + Primes + Indemnités)</p>
+              </div>
+              <div className="w-48 text-right px-4 py-2.5 bg-green-100/50 rounded-lg border-2 border-green-100">
+                <span className="text-green-900 font-black text-xl tabular-nums">
+                  {customLines.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0).toLocaleString('fr-FR')}
+                </span>
+                <span className="text-green-700 text-xs font-bold ml-1">FCFA</span>
+              </div>
+            </div>
+
             <label className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-2">
-              <Layers size={14} /> Cumuls Annuels (Automatisés par le Brut saisi)
+              <Layers size={14} /> Cumuls Annuels (Automatisés par la Base saisie)
             </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase text-[#64748b]">Salaire Brut</label>
+                <label className="text-[10px] font-bold uppercase text-[#64748b]">S. de Base Cumulé</label>
                 <input 
                   type="text" 
                   inputMode="numeric" 
@@ -585,6 +761,10 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
                   }} 
                   className="w-full px-3 py-2 rounded-lg border-2 border-orange-200 bg-orange-50/20 text-sm font-bold shadow-sm" 
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase text-[#64748b]">S. Brut Cumulé</label>
+                <input type="text" value={formatNumeric(ytdGrossSalary)} readOnly className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-gray-50 text-sm italic font-medium text-gray-500" />
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-bold uppercase text-[#64748b]">Net Imposable</label>
@@ -719,10 +899,74 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
           />
         </div>
 
+        {/* Totals Summary Card - Real Time Feedback */}
+        {selectedEmployeeId && !calculationError && (
+          <div className="bg-[#1e293b] p-6 rounded-2xl text-white shadow-xl shadow-blue-900/10 relative overflow-hidden group">
+            <div className="absolute top-2 right-4 flex items-center gap-1.5 opacity-40">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              <span className="text-[8px] font-black uppercase tracking-widest text-green-400">Calcul en temps réel</span>
+            </div>
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-700">
+              <Calculator size={100} />
+            </div>
+            <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-gray-700/50">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-1">
+                  Salaire Brut
+                  <div className="group relative">
+                    <AlertCircle size={10} className="text-blue-300 cursor-help" />
+                    <div className="absolute bottom-full left-0 mb-2 w-56 p-2 bg-gray-800 text-white text-[9px] rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                      Total cumulé (Base + Primes + Indemnités + Heures Sup) avant toute déduction.
+                    </div>
+                  </div>
+                </span>
+                <span className="text-xl font-black tabular-nums">{customLines.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0).toLocaleString('fr-FR')} <span className="text-xs opacity-50">FCFA</span></span>
+              </div>
+              <div className="flex flex-col sm:pl-6 pt-4 sm:pt-0">
+                <span className="text-[10px] font-black text-red-400 uppercase tracking-[0.2em] mb-1">Total Retenues</span>
+                <span className="text-xl font-black tabular-nums text-red-200">{customLines.filter(l => l.type === 'deduction').reduce((acc, l) => acc + (Number(l.amount) || 0), 0).toLocaleString('fr-FR')} <span className="text-xs opacity-50">FCFA</span></span>
+              </div>
+              <div className="flex flex-col sm:pl-6 pt-4 sm:pt-0 bg-blue-500/10 -m-6 p-6 sm:bg-transparent sm:m-0 sm:p-0">
+                <span className="text-[10px] font-black text-yellow-400 uppercase tracking-[0.2em] mb-1">Net à Payer (Est.)</span>
+                <span className="text-2xl font-black tabular-nums text-blue-50 animate-pulse">
+                  {(customLines.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0) - 
+                    customLines.filter(l => l.type === 'deduction').reduce((acc, l) => acc + (Number(l.amount) || 0), 0)
+                  ).toLocaleString('fr-FR')} 
+                  <span className="text-xs opacity-50 ml-1">FCFA</span>
+                </span>
+              </div>
+            </div>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -mr-16 -mt-16 blur-2xl"></div>
+          </div>
+        )}
+
+        {/* Error Alert for Calculation Integrity */}
+        {calculationError && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-50 border-2 border-red-200 p-4 rounded-xl flex items-start gap-4 mb-4"
+          >
+            <div className="bg-red-100 p-2 rounded-lg text-red-600">
+              <AlertCircle size={20} />
+            </div>
+            <div>
+              <p className="text-red-800 font-bold text-sm">Erreur de Calcul Détectée</p>
+              <p className="text-red-600 text-[11px] font-medium leading-relaxed mt-1">
+                Une valeur invalide (NaN ou Infini) a été détectée dans la rubrique : <strong>"{calculationError.label}"</strong>. 
+                <br/>Vérifiez vos taux ou vos sommes de base pour corriger cette erreur avant de continuer.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         <div className="pt-4">
           <button
             type="submit"
-            disabled={!selectedEmployeeId || isGenerating}
+            disabled={!selectedEmployeeId || isGenerating || !!calculationError}
             className="w-full bg-[#2563eb] text-white py-3 rounded-lg font-semibold text-sm shadow-sm hover:opacity-90 transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isGenerating ? (

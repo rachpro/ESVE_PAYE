@@ -1,29 +1,58 @@
 import React, { useState } from 'react';
 import { Company } from '../types';
 import { ShieldCheck, LogOut, Lock, Mail, Key } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface LoginPageProps {
   company: Company;
   onLogin: (remember: boolean) => void;
   onEmailLogin?: (email: string, pass: string, remember: boolean) => Promise<void>;
   onEmailRegister?: (email: string, pass: string, remember: boolean) => Promise<void>;
+  onPasswordReset?: (email: string) => Promise<void>;
   error: string | null;
   onLogout?: () => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ company, onLogin, onEmailLogin, onEmailRegister, error, onLogout }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ company, onLogin, onEmailLogin, onEmailRegister, onPasswordReset, error, onLogout }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
+  const [showReset, setShowReset] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setLocalError('Veuillez saisir votre adresse email.');
+      return;
+    }
+    setLocalError(null);
+    setIsLoading(true);
+    try {
+      if (onPasswordReset) {
+        await onPasswordReset(email);
+        setResetSent(true);
+      }
+    } catch (err: any) {
+      setLocalError('Erreur lors de l\'envoi de l\'email de réinitialisation.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     setIsLoading(true);
+
+    if (!email.trim() || !password.trim()) {
+      setLocalError('Veuillez remplir tous les champs obligatoires.');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       if (isRegistering && onEmailRegister) {
@@ -38,34 +67,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ company, onLogin, onEmailL
 
       // Detailed and user-friendly error mapping
       if (errorCode === 'auth/invalid-credential' || errorCode === 'auth/wrong-password') {
-        errorMessage = 'Les informations de connexion sont incorrectes. Vérifiez votre email et mot de passe.';
+        errorMessage = 'Email ou mot de passe incorrect.';
       } else if (errorCode === 'auth/user-not-found') {
-        errorMessage = "Aucun compte n'est associé à cette adresse email. Souhaitez-vous en créer un ?";
+        errorMessage = 'Compte non trouvé. Veuillez vérifier votre email ou créer un compte.';
       } else if (errorCode === 'auth/email-already-in-use') {
-        errorMessage = 'Cette adresse email est déjà utilisée par un autre compte. Essayez de vous connecter.';
+        errorMessage = 'Cette adresse email est déjà utilisée par un autre compte.';
       } else if (errorCode === 'auth/invalid-email') {
-        errorMessage = "Le format de l'adresse email n'est pas valide.";
+        errorMessage = 'Format d\'email invalide.';
       } else if (errorCode === 'auth/weak-password') {
-        errorMessage = 'Le mot de passe choisi est trop simple. Utilisez au moins 6 caractères.';
-      } else if (errorCode === 'auth/user-disabled') {
-        errorMessage = 'Ce compte a été désactivé. Veuillez contacter le support.';
-      } else if (errorCode === 'auth/operation-not-allowed') {
-        errorMessage = (
-          <div className="space-y-2">
-            <p>La connexion par email/mot de passe n'est pas activée pour ce projet.</p>
-            <p className="text-[10px] opacity-80 bg-red-100 p-2 rounded">
-              Action requise : Allez dans votre Console Firebase → Authentication → Sign-in method → Activez "Email/Password".
-            </p>
-          </div>
-        ) as any;
+        errorMessage = 'Le mot de passe doit contenir au moins 6 caractères.';
       } else if (errorCode === 'auth/too-many-requests') {
-        errorMessage = "Trop de tentatives infructueuses. Votre compte a été temporairement bloqué par sécurité. Réessayez plus tard.";
-      } else if (errorCode === 'auth/network-request-failed') {
-        errorMessage = "Erreur réseau. Vérifiez votre connexion internet.";
-      } else if (rawMessage.includes('auth/')) {
-        // Fallback for codes contained in the message string
-        if (rawMessage.includes('invalid-credential')) errorMessage = 'Email ou mot de passe incorrect.';
-        else if (rawMessage.includes('user-not-found')) errorMessage = 'Utilisateur non trouvé.';
+        errorMessage = 'Trop de tentatives échouées. Compte temporairement bloqué.';
+      } else if (rawMessage.includes('invalid-credential') || rawMessage.includes('wrong-password')) {
+        errorMessage = 'Email ou mot de passe incorrect.';
       }
       
       setLocalError(errorMessage);
@@ -83,10 +97,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ company, onLogin, onEmailL
       }
     } catch (err: any) {
       let errorMessage = err.message || 'Une erreur est survenue avec Google.';
-      const firebaseError = err.code || errorMessage;
-      if (firebaseError.includes('auth/unauthorized-domain')) {
-        errorMessage = "Sécurité Firebase : Le bouton Google n'est pas autorisé sur ce domaine temporaire. Veuillez utiliser un Email et un Mot de passe pour vos tests, ou ajouter l'url de cet onglet à Firebase : Domaines autorisés.";
-      }
       setLocalError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -94,159 +104,217 @@ export const LoginPage: React.FC<LoginPageProps> = ({ company, onLogin, onEmailL
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] p-4 relative overflow-hidden">
-      {/* Decorative blurs */}
-      <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-blue-400/10 rounded-full blur-[100px] -translate-x-1/2 -translate-y-1/2 mix-blend-multiply pointer-events-none"></div>
-      <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-indigo-400/10 rounded-full blur-[100px] translate-x-1/2 translate-y-1/2 mix-blend-multiply pointer-events-none"></div>
-
+    <div className="min-h-screen flex items-center justify-center bg-[#0f172a] p-4 relative overflow-hidden font-sans">
       <motion.div 
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
+        transition={{ duration: 0.6 }}
         className="w-full max-w-md relative z-10"
       >
-        <div className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-[#f1f5f9] overflow-hidden">
-          <div className="p-8 sm:p-10">
-            <div className="flex justify-center mb-8">
-              {company.logo ? (
-                <img src={company.logo} alt="Logo" className="h-16 w-auto object-contain drop-shadow-sm" referrerPolicy="no-referrer" />
-              ) : (
-              <div className="h-16 w-16 bg-[#eff6ff] text-[#2563eb] rounded-2xl flex items-center justify-center border-2 border-dashed border-blue-200">
-                <ShieldCheck size={32} />
-              </div>
-              )}
-            </div>
-
-            <div className="text-center mb-8 space-y-2">
-              <h1 className="text-2xl font-bold text-[#1e293b] tracking-tight">Portail Administrateur</h1>
-              <p className="text-sm text-[#64748b] leading-relaxed">
-                Gestion sécurisée de la Paie et des Décharges pour <br/>
-                <strong className="text-[#1e293b]">{company.name}</strong>.
-              </p>
-            </div>
-
-            {(!error || error === null) && (!localError) ? null : (
-              <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl border border-red-100 text-sm font-medium text-center shadow-sm">
-                {error || localError}
-              </div>
-            )}
-
-            <div className="space-y-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Adresse Email</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail size={16} className="text-gray-400" />
-                    </div>
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      autoComplete="username"
-                      required
-                      className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="votre@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Key size={16} className="text-gray-400" />
-                    </div>
-                    <input
-                      id="password"
-                      name="password"
-                      type="password"
-                      autoComplete={isRegistering ? "new-password" : "current-password"}
-                      required
-                      className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {!isRegistering && (
-                  <div className="flex items-center">
-                    <input
-                      id="remember-me"
-                      name="remember-me"
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
-                    />
-                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 cursor-pointer">
-                      Se souvenir de moi
-                    </label>
+        <div className="bg-white rounded-[2rem] shadow-2xl overflow-hidden border border-white/10">
+          <div className="p-10">
+            {/* Logo Section */}
+            <div className="flex justify-center mb-6">
+              <div className="p-3 bg-white rounded-3xl shadow-lg border-4 border-[#1e293b]">
+                {company.logo ? (
+                  <img src={company.logo} alt="Logo" className="h-20 w-20 object-contain" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="h-20 w-20 bg-slate-100 flex items-center justify-center rounded-2xl">
+                    <ShieldCheck size={40} className="text-[#1e293b]" />
                   </div>
                 )}
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-[#1e293b] hover:bg-[#334155] text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center disabled:opacity-50"
-                >
-                  {isLoading ? 'Chargement...' : (isRegistering ? 'Créer un compte' : 'Se connecter')}
-                </button>
-              </form>
-
-              <div className="text-center text-sm">
-                <button 
-                  type="button" 
-                  onClick={() => setIsRegistering(!isRegistering)}
-                  className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
-                >
-                  {isRegistering ? 'Déjà un compte ? Se connecter' : 'Créer un nouveau compte'}
-                </button>
               </div>
-
-              <div className="relative flex items-center py-2">
-                <div className="flex-grow border-t border-gray-200"></div>
-                <span className="flex-shrink-0 mx-4 text-gray-400 text-sm">Ou</span>
-                <div className="flex-grow border-t border-gray-200"></div>
-              </div>
-
-              <button
-                onClick={handleGoogleLogin}
-                type="button"
-                disabled={isLoading}
-                className="w-full flex items-center justify-center gap-3 bg-white border border-[#e2e8f0] hover:bg-gray-50 text-[#1e293b] font-semibold py-3 px-4 rounded-xl transition-all active:scale-[0.98] shadow-sm hover:shadow disabled:opacity-50"
-              >
-                <svg width="24" height="24" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                  <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" />
-                  <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" />
-                  <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
-                  <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571.001-.001.002-.001.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" />
-                </svg>
-                Continuer avec Google
-              </button>
-              
-              {(error && onLogout) && (
-                <button
-                  onClick={onLogout}
-                  className="w-full flex items-center justify-center gap-2 bg-[#f1f5f9] hover:bg-[#e2e8f0] text-[#1e293b] font-semibold py-3 px-4 rounded-xl transition-all shadow-sm mt-4 border border-[#e2e8f0]"
-                >
-                  <LogOut size={18} />
-                  Se déconnecter de ce compte
-                </button>
-              )}
             </div>
+
+            {/* Header Content */}
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-black text-[#1e293b] tracking-tight uppercase">ESVE-GESTION</h1>
+              <p className="text-[#64748b] font-medium mt-1">Accédez à votre espace personnel</p>
+            </div>
+
+            {/* Error Message */}
+            <AnimatePresence>
+              {(error || localError) && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl border border-red-100 text-sm font-bold text-center flex items-center justify-center gap-2"
+                >
+                  <Lock size={16} />
+                  {error || localError}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Username/Email Input */}
+              <div className="relative group">
+                <input
+                  type="email"
+                  required
+                  placeholder="Nom d'utilisateur*"
+                  className="w-full px-6 py-4 bg-white border-2 border-[#e2e8f0] rounded-2xl focus:border-[#1e293b] outline-none transition-all text-base font-semibold placeholder:text-gray-400"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+
+              {/* Password Input */}
+              <div className="relative group">
+                <input
+                  type="password"
+                  required
+                  placeholder="Mot de passe*"
+                  className="w-full px-6 py-4 bg-white border-2 border-[#e2e8f0] rounded-2xl focus:border-[#1e293b] outline-none transition-all text-base font-semibold placeholder:text-gray-400"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+
+              {!isRegistering && (
+                <div className="flex justify-end pr-2">
+                  <button 
+                    type="button"
+                    onClick={() => setShowReset(true)}
+                    className="text-sm font-bold text-[#64748b] hover:text-[#1e293b] transition-colors"
+                  >
+                    Mot de passe oublié ?
+                  </button>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-[#111827] hover:bg-black text-white font-black text-lg py-4 rounded-2xl transition-all shadow-xl active:scale-[0.98] disabled:opacity-70"
+              >
+                {isLoading ? 'Chargement...' : (isRegistering ? 'S\'enregistrer' : 'Se connecter')}
+              </button>
+            </form>
+
+            {/* OR Separator */}
+            <div className="relative flex items-center my-8">
+              <div className="flex-grow border-t border-gray-200"></div>
+              <span className="flex-shrink-0 mx-4 text-gray-400 text-sm font-medium">ou</span>
+              <div className="flex-grow border-t border-gray-200"></div>
+            </div>
+
+            {/* Create Account Button */}
+            <button
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="w-full bg-[#d97706] hover:bg-[#b45309] text-white font-black text-lg py-4 rounded-2xl transition-all shadow-lg shadow-orange-100 flex items-center justify-center gap-2 active:scale-[0.98]"
+            >
+              🚀 {isRegistering ? 'Me connecter à mon compte' : 'Créer mon compte gratuitement'}
+            </button>
+
+            {/* Secondary Actions */}
+            <div className="mt-8 text-center">
+              <button 
+                onClick={() => window.location.href = '/'}
+                className="text-[#d97706] font-bold text-base hover:underline flex items-center justify-center gap-1 mx-auto"
+              >
+                ← Retour à la page d'accueil
+              </button>
+            </div>
+
+            {/* Google Logic (Optional in UI but kept for functionality) */}
+            {!isRegistering && (
+              <div className="mt-4 pt-4 border-t border-gray-50 flex justify-center">
+                 <button onClick={handleGoogleLogin} className="text-xs text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-widest font-bold">
+                    Ou utiliser Google
+                 </button>
+              </div>
+            )}
           </div>
-          <div className="bg-[#f8fafc] border-t border-[#f1f5f9] p-4 text-center">
-            <p className="text-[11px] font-medium text-[#94a3b8]">
-              {company.name} © {new Date().getFullYear()}
+
+          {/* Footer Credits */}
+          <div className="bg-[#fcfcfc] border-t border-gray-100 py-10 px-8 text-center space-y-3">
+            <div className="w-full h-px bg-gray-100 max-w-[100px] mx-auto mb-6"></div>
+            <p className="text-[12px] text-gray-400 leading-relaxed font-medium">
+              Application développée par <span className="font-bold text-gray-500">Soulama Moumouni Abdoul Wahid</span> & <span className="font-bold text-gray-500">Koné Rachid</span>
+            </p>
+            <p className="text-[11px] text-gray-300 font-medium tracking-tight">
+              Étudiants en 3ème année de Licence — Génie Logiciel
+            </p>
+            <p className="text-[10px] text-gray-300 uppercase tracking-widest font-black">
+              Université Virtuelle du Burkina Faso <span className="text-[8px] opacity-70">BF</span>
             </p>
           </div>
         </div>
       </motion.div>
+
+      {/* Reset Password Modal */}
+      <AnimatePresence>
+        {showReset && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowReset(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl overflow-hidden"
+            >
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4 italic">
+                  <Key size={32} />
+                </div>
+                <h3 className="text-xl font-black text-[#1e293b] uppercase tracking-tight">Réinitialisation</h3>
+                
+                {resetSent ? (
+                  <div className="space-y-6">
+                    <p className="text-sm text-green-600 font-bold bg-green-50 p-4 rounded-xl border border-green-100">
+                      Un email a été envoyé à {email} pour réinitialiser votre mot de passe.
+                    </p>
+                    <button 
+                      onClick={() => { setShowReset(false); setResetSent(false); }}
+                      className="w-full bg-[#111827] text-white font-bold py-3 rounded-xl"
+                    >
+                      Retour à la connexion
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleResetPassword} className="space-y-6">
+                    <p className="text-sm text-[#64748b]">Saisissez votre email pour recevoir un lien de réinitialisation.</p>
+                    <input 
+                      type="email"
+                      required
+                      placeholder="Votre email*"
+                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl focus:border-[#1e293b] outline-none font-semibold"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                    {localError && <p className="text-xs text-red-500 font-bold">{localError}</p>}
+                    <div className="grid grid-cols-2 gap-3">
+                      <button 
+                        type="button"
+                        onClick={() => setShowReset(false)}
+                        className="bg-gray-100 text-gray-600 font-bold py-3 rounded-xl"
+                      >
+                        Annuler
+                      </button>
+                      <button 
+                        type="submit"
+                        disabled={isLoading}
+                        className="bg-[#111827] text-white font-bold py-3 rounded-xl disabled:opacity-70"
+                      >
+                        {isLoading ? 'Envoi...' : 'Envoyer'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
