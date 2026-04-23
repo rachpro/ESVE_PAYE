@@ -45,6 +45,10 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
   const [ytdWorkingHours, setYtdWorkingHours] = useState<number | string>(0);
   const [ytdIncomeTax, setYtdIncomeTax] = useState<number | string>(0);
 
+  const [housingAllowance, setHousingAllowance] = useState<number | string>(0);
+  const [transportAllowance, setTransportAllowance] = useState<number | string>(0);
+  const [functionAllowance, setFunctionAllowance] = useState<number | string>(0);
+
   // Check for NaN or Infinity in lines
   const calculationError = customLines.find(l => {
     const amt = Number(l.amount);
@@ -290,7 +294,12 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
         }
         return line;
       });
-      setCustomLines(calculateAutomatics(updatedLines, Number(nbCharges) || 0));
+      const processed = calculateAutomatics(updatedLines, Number(nbCharges) || 0);
+      setCustomLines(processed);
+      
+      // Auto-sync YTD to monthly gross to avoid user confusion
+      const totalGross = processed.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
+      handleYtdGrossChange(totalGross, Number(nbCharges) || 0);
     }
   };
 
@@ -300,6 +309,9 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     if (emp) {
       setSeniority(emp.seniority || '');
       setBaseSalary(emp.baseSalary || 0);
+      setHousingAllowance(emp.housingAllowance || 0);
+      setTransportAllowance(emp.transportAllowance || 0);
+      setFunctionAllowance(emp.functionAllowance || 0);
       const charges = emp.familyCharges || 0;
       setNbCharges(charges);
       const initialLines: PayrollLine[] = [
@@ -419,7 +431,12 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       ? { ...line, base: safeVal, amount: safeVal, calculationMethod: 'manual' as const } 
       : line
     );
-    setCustomLines(calculateAutomatics(newLines, Number(nbCharges) || 0));
+    const processed = calculateAutomatics(newLines, Number(nbCharges) || 0);
+    setCustomLines(processed);
+    
+    // Auto-sync YTD to monthly gross
+    const totalGross = processed.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
+    handleYtdGrossChange(totalGross, Number(nbCharges) || 0);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -693,12 +710,67 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
                   if (s === '' || !isNaN(Number(s))) {
                     const val = s === '' ? 0 : Number(s);
                     setBenefitsInKind(s === '' ? '' : val);
-                    // Although benefitsInKind isn't currently a line, refreshing ensures 
-                    // that if logic is added to include it in taxable gross, it updates.
                     setCustomLines(calculateAutomatics([...customLines], Number(nbCharges) || 0));
                   }
                 }} 
                 className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-white text-sm" 
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-orange-600">I. Logement</label>
+              <input 
+                type="text" 
+                inputMode="numeric" 
+                value={formatNumeric(housingAllowance)} 
+                onChange={(e) => {
+                  const s = parseNumeric(e.target.value);
+                  if (s === '' || !isNaN(Number(s))) {
+                    const val = s === '' ? 0 : Number(s);
+                    setHousingAllowance(s === '' ? '' : val);
+                    const updated = customLines.map(l => l.label === "Indemnité de logement" ? { ...l, base: val, amount: val } : l);
+                    setCustomLines(calculateAutomatics(updated, Number(nbCharges) || 0));
+                  }
+                }} 
+                className="w-full px-3 py-2 rounded-lg border border-orange-100 bg-white text-sm font-bold text-orange-900" 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-orange-600">I. Transport</label>
+              <input 
+                type="text" 
+                inputMode="numeric" 
+                value={formatNumeric(transportAllowance)} 
+                onChange={(e) => {
+                  const s = parseNumeric(e.target.value);
+                  if (s === '' || !isNaN(Number(s))) {
+                    const val = s === '' ? 0 : Number(s);
+                    setTransportAllowance(s === '' ? '' : val);
+                    const updated = customLines.map(l => l.label === "Indemnité de transport" ? { ...l, base: val, amount: val } : l);
+                    setCustomLines(calculateAutomatics(updated, Number(nbCharges) || 0));
+                  }
+                }} 
+                className="w-full px-3 py-2 rounded-lg border border-orange-100 bg-white text-sm font-bold text-orange-900" 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase text-orange-600">I. Fonction</label>
+              <input 
+                type="text" 
+                inputMode="numeric" 
+                value={formatNumeric(functionAllowance)} 
+                onChange={(e) => {
+                  const s = parseNumeric(e.target.value);
+                  if (s === '' || !isNaN(Number(s))) {
+                    const val = s === '' ? 0 : Number(s);
+                    setFunctionAllowance(s === '' ? '' : val);
+                    const updated = customLines.map(l => l.label === "Indemnité de fonction" ? { ...l, base: val, amount: val } : l);
+                    setCustomLines(calculateAutomatics(updated, Number(nbCharges) || 0));
+                  }
+                }} 
+                className="w-full px-3 py-2 rounded-lg border border-orange-100 bg-white text-sm font-bold text-orange-900" 
               />
             </div>
           </div>
