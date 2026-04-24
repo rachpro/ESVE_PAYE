@@ -34,18 +34,12 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
   const [leaveAcquired, setLeaveAcquired] = useState<number | string>(2.5);
   const [leaveTaken, setLeaveTaken] = useState<number | string>(0);
   const [leaveBalance, setLeaveBalance] = useState<number | string>(22.5);
-  const [nbCharges, setNbCharges] = useState<number | string>(1);
+  const [nbCharges, setNbCharges] = useState<number | string>(0);
   const [baseSalary, setBaseSalary] = useState<number | string>(0);
   const [netImposable, setNetImposable] = useState<number | string>(0);
   const [overtimeHours, setOvertimeHours] = useState<number | string>(0);
   const [workingDays, setWorkingDays] = useState<number | string>(30);
   const [benefitsInKind, setBenefitsInKind] = useState<number | string>(0);
-  const [ytdGrossSalary, setYtdGrossSalary] = useState<number | string>(0);
-  const [ytdNetImposable, setYtdNetImposable] = useState<number | string>(0);
-  const [ytdEmployeeCharges, setYtdEmployeeCharges] = useState<number | string>(0);
-  const [ytdEmployerCharges, setYtdEmployerCharges] = useState<number | string>(0);
-  const [ytdWorkingHours, setYtdWorkingHours] = useState<number | string>(0);
-  const [ytdIncomeTax, setYtdIncomeTax] = useState<number | string>(0);
 
   const [housingAllowance, setHousingAllowance] = useState<number | string>(0);
   const [transportAllowance, setTransportAllowance] = useState<number | string>(0);
@@ -61,8 +55,8 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
 
   // Helper for Burkina Faso Payroll Logic (reusable for YTD and month)
   const computePayrollValues = (gross: number, charges: number) => {
-    // CNSS is calculated on the total gross per user request
-    const cnssBase = gross;
+    // CNSS is calculated on the gross salary capped at 600,000 FCFA
+    const cnssBase = Math.min(gross, 600000);
     
     // Employee deductions
     const employeeCNSS = Math.round(cnssBase * 0.055); // 5.5% (Vieillesse)
@@ -73,24 +67,27 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     let tax = 0;
     
     // Étape B : Application du Barème par tranches (Moteur Sage OHADA)
-    if (taxableBase > 30000) {
+    // Rounding down to the nearest 100 as per standard BF procedure for IUTS
+    const baseForTax = Math.floor(taxableBase / 100) * 100;
+    
+    if (baseForTax > 30000) {
       // 30,000 à 50,000 : 12.1%
-      tax += (Math.min(taxableBase, 50000) - 30000) * 0.121;
-      if (taxableBase > 50000) {
+      tax += (Math.min(baseForTax, 50000) - 30000) * 0.121;
+      if (baseForTax > 50000) {
         // 50,000 à 80,000 : 13.9%
-        tax += (Math.min(taxableBase, 80000) - 50000) * 0.139;
-        if (taxableBase > 80000) {
+        tax += (Math.min(baseForTax, 80000) - 50000) * 0.139;
+        if (baseForTax > 80000) {
           // 80,000 à 120,000 : 15.7%
-          tax += (Math.min(taxableBase, 120000) - 80000) * 0.157;
-          if (taxableBase > 120000) {
+          tax += (Math.min(baseForTax, 120000) - 80000) * 0.157;
+          if (baseForTax > 120000) {
             // 120,000 à 170,000 : 18.4%
-            tax += (Math.min(taxableBase, 170000) - 120000) * 0.184;
-            if (taxableBase > 170000) {
+            tax += (Math.min(baseForTax, 170000) - 120000) * 0.184;
+            if (baseForTax > 170000) {
               // 170,000 à 250,000 : 21.7%
-              tax += (Math.min(taxableBase, 250000) - 170000) * 0.217;
-              if (taxableBase > 250000) {
+              tax += (Math.min(baseForTax, 250000) - 170000) * 0.217;
+              if (baseForTax > 250000) {
                 // Au-dessus de 250,000 : 25% (sur le reste)
-                tax += (taxableBase - 250000) * 0.25;
+                tax += (baseForTax - 250000) * 0.25;
               }
             }
           }
@@ -298,10 +295,6 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       });
       const processed = calculateAutomatics(updatedLines, Number(nbCharges) || 0);
       setCustomLines(processed);
-      
-      // Auto-sync YTD to monthly gross to avoid user confusion
-      const totalGross = processed.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
-      handleYtdGrossChange(totalGross, Number(nbCharges) || 0);
     }
   };
 
@@ -351,7 +344,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       const charges = emp.familyCharges || 0;
       setNbCharges(charges);
       const initialLines: PayrollLine[] = [
-        { label: "NB Charges", nombre: charges, base: 0, rate: 0, amount: 0, type: 'info' },
+        { label: "NB Charges", nombre: charges, base: charges, rate: 0, amount: 0, type: 'info' },
         { label: "Salaire de Base", nombre: 30, base: emp.baseSalary, rate: 3000, amount: emp.baseSalary, type: 'earning' },
         { label: "Indemnité de logement", nombre: 30, base: emp.housingAllowance || 0, rate: 3000, amount: emp.housingAllowance || 0, type: 'earning' },
         { label: "Indemnité de transport", nombre: 30, base: emp.transportAllowance || 0, rate: 3000, amount: emp.transportAllowance || 0, type: 'earning' },
@@ -428,33 +421,11 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       const safeVal = Math.max(0, val);
       setNbCharges(s === '' ? '' : safeVal);
       
-      // Update YTD if gross is present
-      if (ytdGrossSalary) {
-        handleYtdGrossChange(Number(ytdGrossSalary), safeVal);
-      }
-
       // Update the "NB Charges" line visually if it exists
       const updatedLines = customLines.map(l => l.label === "NB Charges" ? { ...l, base: safeVal } : l);
       
       setCustomLines(calculateAutomatics(updatedLines, safeVal));
     }
-  };
-
-  const handleYtdGrossChange = (val: number, currentCharges?: number) => {
-    setYtdGrossSalary(val);
-    const chargesToUse = currentCharges !== undefined ? currentCharges : (Number(nbCharges) || 0);
-    if (!val) {
-      setYtdNetImposable(0);
-      setYtdEmployeeCharges(0);
-      setYtdEmployerCharges(0);
-      setYtdIncomeTax(0);
-      return;
-    }
-    const results = computePayrollValues(val, chargesToUse);
-    setYtdNetImposable(results.taxableBase);
-    setYtdEmployeeCharges(results.totalEmployeeCharges);
-    setYtdEmployerCharges(results.totalEmployerCharges);
-    setYtdIncomeTax(results.incomeTax);
   };
 
   const handleQuickBaseSalaryEntry = (s: string) => {
@@ -469,10 +440,6 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     );
     const processed = calculateAutomatics(newLines, Number(nbCharges) || 0);
     setCustomLines(processed);
-    
-    // Auto-sync YTD to monthly gross
-    const totalGross = processed.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
-    handleYtdGrossChange(totalGross, Number(nbCharges) || 0);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -502,6 +469,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     const deductions = customLines.filter(l => l.type === 'deduction').reduce((acc, l) => acc + Number(parseNumeric(l.amount || 0)), 0);
     const empCharges = customLines.reduce((acc, l) => acc + Number(parseNumeric(l.employerAmount || 0)), 0);
     const netPay = earnings - deductions;
+    const finalNetImposable = customLines.find(l => l.label === "IUTS")?.base || netPay;
 
     const slip: PayrollSlipData = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -514,7 +482,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       grossSalary: earnings,
       netSocialAmount: earnings,
       netPayBeforeTax: earnings,
-      incomeTax: customLines.filter(l => l.category === 'tax').reduce((acc, l) => acc + Number(parseNumeric(l.amount || 0)), 0),
+      incomeTax: customLines.filter(l => l.category === 'tax' && l.label === "IUTS").reduce((acc, l) => acc + Number(parseNumeric(l.amount || 0)), 0),
       netPay: netPay,
       totalEmployerCost: earnings + empCharges,
       convention,
@@ -523,18 +491,12 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       leaveTaken: Number(parseNumeric(leaveTaken)) || 0,
       leaveBalance: Number(parseNumeric(leaveBalance)) || 0,
       nbCharges: Number(parseNumeric(nbCharges)) || 0,
-      netImposable: Number(parseNumeric(netImposable)) || netPay,
+      netImposable: Number(finalNetImposable),
       totalEmployeeCharges: deductions,
       totalEmployerCharges: empCharges,
       overtimeHours: Number(parseNumeric(overtimeHours)) || 0,
       benefitsInKind: Number(parseNumeric(benefitsInKind)) || 0,
       workingHours: employee.workingHours,
-      ytdGrossSalary: Number(parseNumeric(ytdGrossSalary)) || 0,
-      ytdNetImposable: Number(parseNumeric(ytdNetImposable)) || 0,
-      ytdEmployeeCharges: Number(parseNumeric(ytdEmployeeCharges)) || 0,
-      ytdEmployerCharges: Number(parseNumeric(ytdEmployerCharges)) || 0,
-      ytdWorkingHours: Number(parseNumeric(ytdWorkingHours)) || 0,
-      ytdIncomeTax: Number(parseNumeric(ytdIncomeTax)) || 0,
     };
     
     setPendingSlip(slip);
@@ -930,47 +892,6 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
                 <span className="text-green-700 text-xs font-bold ml-1">FCFA</span>
               </div>
             </div>
-
-            <label className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-2">
-              <Layers size={14} /> Cumuls Annuels (Automatisés par la Base saisie)
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase text-[#64748b]">S. de Base Cumulé</label>
-                <input 
-                  type="text" 
-                  inputMode="numeric" 
-                  value={formatNumeric(ytdGrossSalary)} 
-                  onChange={(e) => {
-                    const s = parseNumeric(e.target.value);
-                    if (s === '' || !isNaN(Number(s))) {
-                      handleYtdGrossChange(Number(s));
-                    }
-                  }} 
-                  className="w-full px-3 py-2 rounded-lg border-2 border-orange-200 bg-orange-50/20 text-sm font-bold shadow-sm" 
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase text-[#64748b]">S. Brut Cumulé</label>
-                <input type="text" value={formatNumeric(ytdGrossSalary)} readOnly className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-gray-50 text-sm italic font-medium text-gray-500" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase text-[#64748b]">Net Imposable</label>
-                <input type="text" value={formatNumeric(ytdNetImposable)} readOnly className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-gray-50 text-sm italic font-medium text-gray-500" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase text-[#64748b]">Charges Sal.</label>
-                <input type="text" value={formatNumeric(ytdEmployeeCharges)} readOnly className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-gray-50 text-sm italic font-medium text-gray-500" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase text-[#64748b]">Charges Pat.</label>
-                <input type="text" value={formatNumeric(ytdEmployerCharges)} readOnly className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-gray-50 text-sm italic font-medium text-gray-500" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase text-[#64748b]">IUTS Cumulé</label>
-                <input type="text" value={formatNumeric(ytdIncomeTax)} readOnly className="w-full px-3 py-2 rounded-lg border border-blue-100 bg-gray-50 text-sm italic font-medium text-gray-500" />
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1100,30 +1021,28 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
             <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform duration-700">
               <Calculator size={100} />
             </div>
-            <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-gray-700/50">
+            <div className="relative z-10 grid grid-cols-1 sm:grid-cols-4 gap-6 divide-y sm:divide-y-0 sm:divide-x divide-gray-700/50">
               <div className="flex flex-col">
                 <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-1">
                   Salaire Brut
-                  <div className="group relative">
-                    <AlertCircle size={10} className="text-blue-300 cursor-help" />
-                    <div className="absolute bottom-full left-0 mb-2 w-56 p-2 bg-gray-800 text-white text-[9px] rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                      Total cumulé (Base + Primes + Indemnités + Heures Sup) avant toute déduction.
-                    </div>
-                  </div>
                 </span>
-                <span className="text-xl font-black tabular-nums">{customLines.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0).toLocaleString('fr-FR')} <span className="text-xs opacity-50">FCFA</span></span>
+                <span className="text-lg font-black tabular-nums">{customLines.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0).toLocaleString('fr-FR')} <span className="text-[10px] opacity-50">FCFA</span></span>
               </div>
               <div className="flex flex-col sm:pl-6 pt-4 sm:pt-0">
-                <span className="text-[10px] font-black text-red-400 uppercase tracking-[0.2em] mb-1">Total Retenues</span>
-                <span className="text-xl font-black tabular-nums text-red-200">{customLines.filter(l => l.type === 'deduction').reduce((acc, l) => acc + (Number(l.amount) || 0), 0).toLocaleString('fr-FR')} <span className="text-xs opacity-50">FCFA</span></span>
+                <span className="text-[10px] font-black text-red-400 uppercase tracking-[0.2em] mb-1">Retenues Sal.</span>
+                <span className="text-lg font-black tabular-nums text-red-200">{customLines.filter(l => l.type === 'deduction').reduce((acc, l) => acc + (Number(l.amount) || 0), 0).toLocaleString('fr-FR')} <span className="text-[10px] opacity-50">FCFA</span></span>
+              </div>
+              <div className="flex flex-col sm:pl-6 pt-4 sm:pt-0">
+                <span className="text-[10px] font-black text-blue-300 uppercase tracking-[0.2em] mb-1">Charges Pat.</span>
+                <span className="text-lg font-black tabular-nums text-blue-100">{customLines.reduce((acc, l) => acc + (Number(l.employerAmount) || 0), 0).toLocaleString('fr-FR')} <span className="text-[10px] opacity-50">FCFA</span></span>
               </div>
               <div className="flex flex-col sm:pl-6 pt-4 sm:pt-0 bg-blue-500/10 -m-6 p-6 sm:bg-transparent sm:m-0 sm:p-0">
-                <span className="text-[10px] font-black text-yellow-400 uppercase tracking-[0.2em] mb-1">Net à Payer (Est.)</span>
-                <span className="text-2xl font-black tabular-nums text-blue-50 animate-pulse">
+                <span className="text-[10px] font-black text-yellow-400 uppercase tracking-[0.2em] mb-1">Net à Payer</span>
+                <span className="text-xl font-black tabular-nums text-blue-50 animate-pulse">
                   {(customLines.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0) - 
                     customLines.filter(l => l.type === 'deduction').reduce((acc, l) => acc + (Number(l.amount) || 0), 0)
                   ).toLocaleString('fr-FR')} 
-                  <span className="text-xs opacity-50 ml-1">FCFA</span>
+                  <span className="text-[10px] opacity-50 ml-1">FCFA</span>
                 </span>
               </div>
             </div>

@@ -339,60 +339,21 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
         </table>
       </div>
 
-      {/* Net Pay Bar (Prominent Styling) */}
+      {/* Net Pay Bar (High Contrast Styling) */}
       <div className="mt-4">
-        <div className="flex items-stretch rounded-xl overflow-hidden border-8 border-[#1e293b] shadow-xl">
-          <div className="bg-[#1e293b] text-white p-5 flex-1 flex flex-col justify-center">
+        <div className="flex items-stretch rounded-xl overflow-hidden border-4 border-[#1e293b]">
+          <div className="bg-white text-[#1e293b] p-5 flex-1 flex flex-col justify-center border-r-4 border-[#1e293b]">
             <h4 className="text-xl font-black uppercase tracking-tighter leading-none mb-1">NET À PAYER AU SALARIÉ</h4>
-            <p className="text-[10px] text-blue-400 italic font-bold">Total net après déduction des cotisations et impôts</p>
+            <p className="text-[10px] text-[#64748b] italic font-bold">Total net après déduction des cotisations et impôts</p>
           </div>
-          <div className="bg-blue-600 flex items-center justify-center px-12 border-l-8 border-[#1e293b]">
-            <span className="text-4xl font-black text-white tabular-nums tracking-tighter drop-shadow-md">
+          <div className="bg-white flex items-center justify-center px-12">
+            <span className="text-4xl font-black text-[#1e293b] tabular-nums tracking-tighter">
               {data.netPay.toLocaleString('fr-FR')} 
-              <span className="text-xl opacity-80 ml-2">FCFA</span>
+              <span className="text-xl text-[#64748b] ml-2">FCFA</span>
             </span>
           </div>
         </div>
       </div>
-
-      {/* Cumuls Table (Compact) */}
-      {data.ytdGrossSalary ? (
-        <div className="mt-4 border-2 border-[#cbd5e1] rounded-lg overflow-hidden">
-          <table className="w-full text-center text-[9px] border-collapse">
-            <thead className="bg-[#f8fafc] border-b-2 border-[#cbd5e1]">
-              <tr className="divide-x-2 divide-[#cbd5e1] text-[#1e293b] font-black uppercase tracking-widest text-[8px]">
-                <th className="py-1.5 w-24 italic bg-slate-50">CUMULS</th>
-                <th className="py-1.5">Salaire Brut</th>
-                <th className="py-1.5">Net Imposable</th>
-                <th className="py-1.5">Charges Sal.</th>
-                <th className="py-1.5">Charges Pat.</th>
-                <th className="py-1.5">IUTS</th>
-                <th className="py-1.5">Heures Trav.</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="divide-x-2 divide-[#cbd5e1] font-bold">
-                <td className="py-1.5 bg-[#f8fafc] uppercase text-[8px] font-black">Période</td>
-                <td className="py-1.5">{data.grossSalary.toLocaleString()}</td>
-                <td className="py-1.5">{data.netImposable?.toLocaleString() || '-'}</td>
-                <td className="py-1.5">{(data.grossSalary - data.netPay).toLocaleString()}</td>
-                <td className="py-1.5">{(data.totalEmployerCost - data.grossSalary).toLocaleString()}</td>
-                <td className="py-1.5">{data.incomeTax.toLocaleString()}</td>
-                <td className="py-1.5">{data.workingHours || '173'}</td>
-              </tr>
-              <tr className="divide-x-2 divide-[#cbd5e1] border-t-2 border-[#cbd5e1] text-[#1e293b] bg-slate-50 font-black">
-                <td className="py-1.5 bg-[#f8fafc] italic">Cumul Annuel</td>
-                <td className="py-1.5">{data.ytdGrossSalary.toLocaleString()}</td>
-                <td className="py-1.5">{data.ytdNetImposable?.toLocaleString() || '-'}</td>
-                <td className="py-1.5">{data.ytdEmployeeCharges?.toLocaleString() || '-'}</td>
-                <td className="py-1.5">{data.ytdEmployerCharges?.toLocaleString() || '-'}</td>
-                <td className="py-1.5">{data.ytdIncomeTax?.toLocaleString() || '-'}</td>
-                <td className="py-1.5">{data.ytdWorkingHours || '-'}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      ) : null}
 
       {/* Signature Section (Compact) */}
       <div className="mt-6 grid grid-cols-2 gap-10 mb-4 px-4">

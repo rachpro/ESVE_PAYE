@@ -133,10 +133,4 @@ export interface PayrollSlipData {
   overtimeAmount?: number;
   benefitsInKind?: number;
   workingHours?: number;
-  ytdGrossSalary?: number;
-  ytdNetImposable?: number;
-  ytdEmployeeCharges?: number;
-  ytdEmployerCharges?: number;
-  ytdWorkingHours?: number;
-  ytdIncomeTax?: number;
 }

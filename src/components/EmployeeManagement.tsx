@@ -39,7 +39,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
     department: '',
     qualification: '',
     workingHours: 173,
-    email: ''
+    email: '',
+    familyCharges: 0
   });
 
   const validateField = (name: string, value: any) => {
@@ -144,7 +145,8 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
       department: '',
       qualification: '',
       workingHours: 173,
-      email: ''
+      email: '',
+      familyCharges: 0
     });
     setErrors({});
     setShowSaveConfirm(false);
