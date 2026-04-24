@@ -78,8 +78,8 @@ const doc = new Document({
                 width: { size: 100, type: WidthType.PERCENTAGE },
                 rows: [
                     new TableRow({ children: [
-                        new TableCell({ children: [new Paragraph({ text: "Tranche (FCFA)", bold: true })] }),
-                        new TableCell({ children: [new Paragraph({ text: "Taux", bold: true })] }),
+                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Tranche (FCFA)", bold: true })] })] }),
+                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Taux", bold: true })] })] }),
                     ]}),
                     new TableRow({ children: [new TableCell({ children: [new Paragraph("0 à 30 000")] }), new TableCell({ children: [new Paragraph("0 %")] })]}),
                     new TableRow({ children: [new TableCell({ children: [new Paragraph("30 001 à 50 000")] }), new TableCell({ children: [new Paragraph("12,1 %")] })]}),

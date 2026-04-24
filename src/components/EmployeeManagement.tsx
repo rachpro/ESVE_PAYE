@@ -42,15 +42,42 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
     email: ''
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    if (errors[name]) {
+  const validateField = (name: string, value: any) => {
+    let error = '';
+    const valStr = String(value || '').trim();
+    
+    switch (name) {
+      case 'firstName':
+        if (!valStr) error = 'Le prénom est obligatoire pour identifier l\'employé';
+        break;
+      case 'lastName':
+        if (!valStr) error = 'Le nom de famille est obligatoire';
+        break;
+      case 'position':
+        if (!valStr) error = 'Veuillez préciser le poste occupé';
+        break;
+      case 'email':
+        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) error = 'Format d\'email invalide (ex: nom@entreprise.com)';
+        break;
+      case 'baseSalary':
+        if (value !== undefined && isNaN(Number(parseNumeric(value)))) error = 'Le salaire doit être un nombre valide';
+        break;
+    }
+    
+    if (error) {
+      setErrors(prev => ({ ...prev, [name]: error }));
+    } else {
       setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
+        const next = { ...prev };
+        delete next[name];
+        return next;
       });
     }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    
     setFormData(prev => {
       let processedValue: any = value;
       if (name === 'baseSalary' || name === 'workingHours' || name === 'transportAllowance' || name === 'housingAllowance' || name === 'functionAllowance') {
@@ -63,6 +90,9 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
       }
       return { ...prev, [name]: processedValue };
     });
+
+    // Dynamic validation
+    validateField(name, value);
   };
 
   const validate = () => {
@@ -71,7 +101,6 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
     if (!formData.firstName?.trim()) newErrors.firstName = 'Le prénom est obligatoire';
     if (!formData.lastName?.trim()) newErrors.lastName = 'Le nom est obligatoire';
     if (!formData.position?.trim()) newErrors.position = 'Le poste est obligatoire';
-    if (currentBaseSalary <= 0) newErrors.baseSalary = 'Le salaire de base doit être supérieur à 0';
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = 'Format d\'email invalide';
     
     setErrors(newErrors);
@@ -252,7 +281,12 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
                 onChange={handleChange} 
                 className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.firstName ? 'border-red-500 bg-red-50' : 'border-[#e2e8f0]'}`}
               />
-              {errors.firstName && <p className="text-[11px] text-red-500 font-medium italic">{errors.firstName}</p>}
+              {errors.firstName && (
+                <p className="text-[11px] text-red-500 font-medium italic flex items-center gap-1 mt-1">
+                  <AlertTriangle size={12} />
+                  {errors.firstName}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Nom <span className="text-red-500">*</span></label>
@@ -261,12 +295,17 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
                 name="lastName" 
                 value={formData.lastName} 
                 onChange={handleChange} 
-                className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.lastName ? 'border-red-500 bg-red-50' : 'border-[#e2e8f0]'}`}
+                className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.lastName ? 'border-red-500 bg-red-50 ring-1 ring-red-200' : 'border-[#e2e8f0]'}`}
               />
-              {errors.lastName && <p className="text-[11px] text-red-500 font-medium italic">{errors.lastName}</p>}
+              {errors.lastName && (
+                <p className="text-[11px] text-red-500 font-medium italic flex items-center gap-1 mt-1">
+                  <AlertTriangle size={12} />
+                  {errors.lastName}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Salaire de Base <span className="text-red-500">*</span></label>
+              <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Salaire de Base</label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                 <input 
@@ -275,11 +314,16 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
                   name="baseSalary" 
                   value={formatNumeric(formData.baseSalary)} 
                   onChange={handleChange} 
-                  className={`w-full pl-9 pr-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.baseSalary ? 'border-red-500 bg-red-50' : 'border-[#e2e8f0]'}`}
+                  className={`w-full pl-9 pr-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.baseSalary ? 'border-red-500 bg-red-50 ring-1 ring-red-200' : 'border-[#e2e8f0]'}`}
                   placeholder="Ex: 150 000"
                 />
               </div>
-              {errors.baseSalary && <p className="text-[11px] text-red-500 font-medium italic">{errors.baseSalary}</p>}
+              {errors.baseSalary && (
+                <p className="text-[11px] text-red-500 font-medium italic flex items-center gap-1 mt-1">
+                  <AlertTriangle size={12} />
+                  {errors.baseSalary}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Poste <span className="text-red-500">*</span></label>
@@ -288,9 +332,14 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
                 name="position" 
                 value={formData.position} 
                 onChange={handleChange} 
-                className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.position ? 'border-red-500 bg-red-50' : 'border-[#e2e8f0]'}`}
+                className={`w-full px-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.position ? 'border-red-500 bg-red-50 ring-1 ring-red-200' : 'border-[#e2e8f0]'}`}
               />
-              {errors.position && <p className="text-[11px] text-red-500 font-medium italic">{errors.position}</p>}
+              {errors.position && (
+                <p className="text-[11px] text-red-500 font-medium italic flex items-center gap-1 mt-1">
+                  <AlertTriangle size={12} />
+                  {errors.position}
+                </p>
+              )}
             </div>
 
             {/* Indemnities Section */}
@@ -418,11 +467,16 @@ export const EmployeeManagement: React.FC<EmployeeManagementProps> = ({ employee
                   name="email" 
                   value={formData.email || ''} 
                   onChange={handleChange} 
-                  className={`w-full pl-9 pr-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.email ? 'border-red-500 bg-red-50' : 'border-[#e2e8f0]'}`}
+                  className={`w-full pl-9 pr-4 py-2 rounded-lg border focus:ring-2 focus:ring-[#2563eb] outline-none text-sm transition-all ${errors.email ? 'border-red-500 bg-red-50 ring-1 ring-red-200' : 'border-[#e2e8f0]'}`}
                   placeholder="exemple@email.com"
                 />
               </div>
-              {errors.email && <p className="text-[11px] text-red-500 font-medium italic">{errors.email}</p>}
+              {errors.email && (
+                <p className="text-[11px] text-red-500 font-medium italic flex items-center gap-1 mt-1">
+                  <AlertTriangle size={12} />
+                  {errors.email}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">N° CNIB</label>

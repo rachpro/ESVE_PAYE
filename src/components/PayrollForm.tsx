@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Employee, Company } from '../types';
 import { calculatePayroll, DEFAULT_COMPANY } from '../lib/calculations';
-import { Calculator, UserPlus, Calendar, DollarSign, Plus, Trash2, AlertCircle, CheckCircle2, Activity, Layers } from 'lucide-react';
+import { Calculator, UserPlus, Calendar, DollarSign, Plus, Trash2, AlertCircle, CheckCircle2, Activity, Layers, Search, ChevronDown, X } from 'lucide-react';
 import { PayrollSlipData, PayrollLine } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatNumeric, parseNumeric } from '../lib/numericUtils';
@@ -14,6 +14,8 @@ interface PayrollFormProps {
 
 export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, onGenerate }) => {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingSlip, setPendingSlip] = useState<PayrollSlipData | null>(null);
   const [period, setPeriod] = useState(() => {
@@ -303,6 +305,40 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     }
   };
 
+  const filteredEmployees = React.useMemo(() => {
+    if (!searchQuery.trim()) return employees;
+    const query = searchQuery.toLowerCase().trim();
+    return employees.filter(emp => 
+      emp.firstName.toLowerCase().includes(query) || 
+      emp.lastName.toLowerCase().includes(query) || 
+      (emp.matricule && emp.matricule.toLowerCase().includes(query)) ||
+      (emp.position && emp.position.toLowerCase().includes(query))
+    );
+  }, [employees, searchQuery]);
+
+  const highlightMatch = (text: string, query: string) => {
+    if (!query || !text) return text;
+    // Escape special regex characters to avoid crashes
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const parts = text.split(new RegExp(`(${escapedQuery})`, 'gi'));
+    return (
+      <span>
+        {parts.map((part, i) => 
+          part.toLowerCase() === query.toLowerCase() ? (
+            <span key={i} className="bg-yellow-100 text-yellow-800 font-bold px-0.5 rounded">{part}</span>
+          ) : part
+        )}
+      </span>
+    );
+  };
+
+  const handleEmployeeSelect = (emp: Employee) => {
+    setSelectedEmployeeId(emp.id);
+    setSearchQuery(`${emp.firstName} ${emp.lastName}`);
+    setIsDropdownOpen(false);
+    handleEmployeeChange(emp.id);
+  };
+
   const handleEmployeeChange = (id: string) => {
     setSelectedEmployeeId(id);
     const emp = employees.find(e => e.id === id);
@@ -550,24 +586,104 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
 
       <form onSubmit={handleSubmit} className="p-8 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
+          <div className="space-y-2 relative">
             <label className="text-xs font-semibold uppercase tracking-wider text-[#64748b] flex items-center gap-2">
               <UserPlus size={14} />
               EMPLOYÉ <span className="text-red-500">*</span>
             </label>
-            <select
-              required
-              value={selectedEmployeeId || ''}
-              onChange={(e) => handleEmployeeChange(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all appearance-none bg-white text-sm"
-            >
-              <option value="">Choisir un employé...</option>
-              {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.firstName} {emp.lastName} - {emp.position}
-                </option>
-              ))}
-            </select>
+            <div className="relative group">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94a3b8]">
+                <Search size={16} />
+              </div>
+              <input
+                type="text"
+                placeholder="Rechercher par nom, prénom ou matricule..."
+                value={searchQuery}
+                onFocus={() => setIsDropdownOpen(true)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsDropdownOpen(true);
+                  if (!e.target.value) {
+                    setSelectedEmployeeId('');
+                  }
+                }}
+                className={`w-full pl-10 pr-10 py-2.5 rounded-lg border border-[#e2e8f0] focus:ring-2 focus:ring-[#2563eb] outline-none transition-all bg-white text-sm ${selectedEmployeeId ? 'border-blue-200 bg-blue-50/10' : ''}`}
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedEmployeeId('');
+                      setIsDropdownOpen(false);
+                    }}
+                    className="p-1 hover:bg-gray-100 rounded-full text-gray-400"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+                <ChevronDown 
+                  size={16} 
+                  className={`text-[#94a3b8] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} 
+                />
+              </div>
+
+              <AnimatePresence>
+                {isDropdownOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setIsDropdownOpen(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute top-full left-0 right-0 mt-2 bg-white border border-[#e2e8f0] rounded-xl shadow-xl z-20 max-h-[300px] overflow-y-auto overflow-x-hidden"
+                    >
+                      {filteredEmployees.length > 0 ? (
+                        <div className="p-2">
+                          {filteredEmployees.map((emp) => (
+                            <button
+                              key={emp.id}
+                              type="button"
+                              onClick={() => handleEmployeeSelect(emp)}
+                              className={`w-full text-left p-3 rounded-lg flex items-center justify-between transition-colors ${
+                                selectedEmployeeId === emp.id 
+                                  ? 'bg-blue-50 border border-blue-100' 
+                                  : 'hover:bg-gray-50 border border-transparent'
+                              }`}
+                            >
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold text-[#1e293b]">
+                                  {highlightMatch(`${emp.firstName} ${emp.lastName}`, searchQuery)}
+                                </span>
+                                <div className="flex items-center gap-3 mt-0.5">
+                                  <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-mono">
+                                    {highlightMatch(emp.matricule || 'N/A', searchQuery)}
+                                  </span>
+                                  <span className="text-[10px] text-[#64748b]">
+                                    {highlightMatch(emp.position, searchQuery)}
+                                  </span>
+                                </div>
+                              </div>
+                              {selectedEmployeeId === emp.id && (
+                                <CheckCircle2 size={16} className="text-blue-600" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-8 text-center">
+                          <p className="text-sm text-[#64748b]">Aucun employé ne correspond à "{searchQuery}"</p>
+                        </div>
+                      )}
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           <div className="space-y-2">
