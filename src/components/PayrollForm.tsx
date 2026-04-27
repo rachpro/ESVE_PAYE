@@ -152,31 +152,64 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     };
   };
 
+  // Totals calculation using useMemo for reliability
+  const totals = React.useMemo(() => {
+    const rawEarnings = customLines
+      .filter((l) => l.type === 'earning' && l.label !== "SALAIRE BRUT")
+      .reduce((acc, l) => acc + (Number(parseNumeric(l.amount)) || 0), 0);
+    
+    const rawDeductions = customLines
+      .filter((l) => l.type === 'deduction')
+      .reduce((acc, l) => acc + (Number(parseNumeric(l.amount)) || 0), 0);
+      
+    const rawEmployerCharges = customLines.reduce(
+      (acc, l) => acc + (Number(parseNumeric(l.employerAmount)) || 0),
+      0
+    );
+
+    return {
+      earnings: rawEarnings,
+      deductions: rawDeductions,
+      employerCharges: rawEmployerCharges,
+      net: rawEarnings - rawDeductions,
+    };
+  }, [customLines]);
+
   const calculateAutomatics = (lines: PayrollLine[], dependents: number) => {
-    // 1st Pass: Simple Earnings and Base salary determination
+    const days = Number(workingDays) > 0 ? Number(workingDays) : 30;
+    
+    // 1st Pass: Base salary and pro-rata earnings
     let currentBaseSalary = 0;
     const initialProcessed = lines.map(line => {
       const newLine = { ...line };
-      if (line.label === "Salaire de Base") currentBaseSalary = Number(line.base) || 0;
+      const baseVal = Number(line.base) || 0;
       
-      // Overtime calculation: (Base Salary / 173.33) * (Rate / 100) * Number
+      if (line.label === "Salaire de Base") {
+        currentBaseSalary = baseVal;
+      }
+      
+      // Pro-rata based on working days
+      if (line.type === 'earning' && line.label !== "NB Charges" && !line.label.toLowerCase().includes('nb') && line.label !== "Heures Supplémentaires" && line.label !== "SALAIRE BRUT") {
+        if (line.calculationMethod === 'percent_base' || line.calculationMethod === 'percent_gross') {
+           // Skip pro-rata for percentage based lines, they will be handled in later passes
+        } else {
+          newLine.amount = Math.round(baseVal * (days / 30));
+        }
+      }
+      
+      // Overtime calculation
       if (line.label === "Heures Supplémentaires" && currentBaseSalary > 0) {
         const hourlyRate = currentBaseSalary / 173.33;
         const coef = (Number(line.rate) || 125) / 100;
         const hours = Number(line.nombre) || 0;
         newLine.base = Math.round(hourlyRate);
         newLine.amount = Math.round(hourlyRate * coef * hours);
-      } else if (line.type === 'earning' && line.nombre !== undefined && line.label !== "NB Charges" && !line.label.toLowerCase().includes('nb') && line.label !== "Heures Supplémentaires") {
-        // Pro-rata calculation for earnings based on working days (nombre)
-        const base = Number(line.base) || 0;
-        const nombre = Number(line.nombre) || 0;
-        newLine.amount = Math.round(base * (nombre / 30));
       }
       
       return newLine;
     });
 
-    // 2nd Pass: Handle Bonuses/Indemnities with dynamic methods
+    // 2nd Pass: Percentage based on base salary
     let grossEarnings = 0;
     const withBonuses = initialProcessed.map(line => {
       const newLine = { ...line };
@@ -191,25 +224,21 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       return newLine;
     });
 
-    // 3rd Pass: Handle percent_gross (needs total gross including all previous)
-    // To simplify and avoid circularity, we calculate percent_gross on the final gross earnings 
-    // of NON-percent_gross lines.
+    // 3rd Pass: Percentage based on gross salary
     const finalEarnings = withBonuses.map(line => {
       const newLine = { ...line };
       if (line.type === 'earning' && line.calculationMethod === 'percent_gross') {
         newLine.base = grossEarnings;
         const rateValue = Number(line.rate) || 0;
         newLine.amount = Math.round(grossEarnings * (rateValue / 100));
-        // We don't add to grossEarnings here to avoid circularity if multiple exist
-        // but for a single pass logic, we might need a 4th pass for social.
       }
       return newLine;
     });
 
-    // Final Gross for Social/Tax calculation
-    const totalGross = finalEarnings.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
+    // Final Total Gross
+    const totalGross = finalEarnings.filter(l => l.type === 'earning' && l.label !== "SALAIRE BRUT").reduce((acc, l) => acc + (Number(l.amount) || 0), 0);
     
-    // Extract key values for smarter tax exemptions
+    // Results for taxes
     const baseLine = finalEarnings.find(l => l.label === "Salaire de Base");
     const hLine = finalEarnings.find(l => l.label === "Indemnité de logement");
     const tLine = finalEarnings.find(l => l.label === "Indemnité de transport");
@@ -233,11 +262,10 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
         return newLine;
       }
 
-      // Identify and apply bases/rates dynamically for specific labels (Social/Tax)
+      // Specific Social/Tax labels updates
       if (line.label === "Retenue Risques Professionnels") {
         newLine.category = 'social';
         newLine.base = Math.min(totalGross, 600000);
-        newLine.rate = 0;
         newLine.employerRate = 3.5;
       } else if (line.label === "Retenue Assurances vieillesses") {
         newLine.category = 'social';
@@ -247,35 +275,31 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       } else if (line.label === "Retenue Prestations Familiales") {
         newLine.category = 'social';
         newLine.base = Math.min(totalGross, 600000);
-        newLine.rate = 0;
         newLine.employerRate = 7.0;
       } else if (line.label === "TPA") {
         newLine.category = 'tax';
         newLine.base = totalGross;
-        newLine.rate = 0;
         newLine.employerRate = 3.0;
       } else if (line.label === "RETENUE FSP 1%") {
         newLine.category = 'tax';
-        newLine.base = totalGross - results.employeeCNSS - results.incomeTax;
+        newLine.base = Math.max(0, totalGross - results.employeeCNSS - results.incomeTax);
         newLine.rate = 1.0;
         newLine.amount = results.fsp;
-        newLine.employerRate = 0;
       } else if (line.label === "IUTS") {
         newLine.category = 'tax';
         newLine.amount = results.incomeTax;
         newLine.base = results.taxableBase;
         newLine.rate = 0; 
-      } else if (line.category === 'social') {
-        newLine.base = Math.min(totalGross, 600000);
       }
 
-      // Final calculation for Social/Tax (except IUTS/FSP which are already set)
+      // Auto-calculate deductions/info from base/rate
       if (newLine.base !== undefined && (newLine.type === 'deduction' || newLine.type === 'info') && newLine.label !== "IUTS" && newLine.label !== "RETENUE FSP 1%") {
+        const lineBase = Number(newLine.base) || 0;
         if (newLine.rate !== undefined && newLine.rate !== 0) {
-          newLine.amount = Math.round(Number(newLine.base) * (Number(newLine.rate) / 100));
+          newLine.amount = Math.round(lineBase * (Number(newLine.rate) / 100));
         }
         if (newLine.employerRate !== undefined && newLine.employerRate !== 0) {
-          newLine.employerAmount = Math.round(Number(newLine.base) * (Number(newLine.employerRate) / 100));
+          newLine.employerAmount = Math.round(lineBase * (Number(newLine.employerRate) / 100));
         }
       }
 
@@ -375,19 +399,25 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     setSelectedEmployeeId(id);
     const emp = employees.find(e => e.id === id);
     if (emp) {
+      const bS = Number(parseNumeric(emp.baseSalary || 0));
+      const hA = Number(parseNumeric(emp.housingAllowance || 0));
+      const tA = Number(parseNumeric(emp.transportAllowance || 0));
+      const fA = Number(parseNumeric(emp.functionAllowance || 0));
+      const charges = Number(parseNumeric(emp.familyCharges || 0));
+
       setSeniority(emp.seniority || '');
-      setBaseSalary(emp.baseSalary || 0);
-      setHousingAllowance(emp.housingAllowance || 0);
-      setTransportAllowance(emp.transportAllowance || 0);
-      setFunctionAllowance(emp.functionAllowance || 0);
-      const charges = emp.familyCharges || 0;
+      setBaseSalary(bS);
+      setHousingAllowance(hA);
+      setTransportAllowance(tA);
+      setFunctionAllowance(fA);
       setNbCharges(charges);
+
       const initialLines: PayrollLine[] = [
         { label: "NB Charges", nombre: charges, base: charges, rate: 0, amount: 0, type: 'info' },
-        { label: "Salaire de Base", nombre: 30, base: emp.baseSalary, rate: 3000, amount: emp.baseSalary, type: 'earning' },
-        { label: "Indemnité de logement", nombre: 30, base: emp.housingAllowance || 0, rate: 3000, amount: emp.housingAllowance || 0, type: 'earning' },
-        { label: "Indemnité de transport", nombre: 30, base: emp.transportAllowance || 0, rate: 3000, amount: emp.transportAllowance || 0, type: 'earning' },
-        { label: "Indemnité de fonction", nombre: 30, base: emp.functionAllowance || 0, amount: emp.functionAllowance || 0, type: 'earning' },
+        { label: "Salaire de Base", nombre: 30, base: bS, rate: 0, amount: bS, type: 'earning' },
+        { label: "Indemnité de logement", nombre: 30, base: hA, rate: 0, amount: hA, type: 'earning' },
+        { label: "Indemnité de transport", nombre: 30, base: tA, rate: 0, amount: tA, type: 'earning' },
+        { label: "Indemnité de fonction", nombre: 30, base: fA, amount: fA, type: 'earning' },
         { label: "Heures Supplémentaires", nombre: 0, base: 0, rate: 125, amount: 0, type: 'earning' },
         { label: "SALAIRE BRUT", base: 0, amount: 0, type: 'info' },
         { label: "Retenue Risques Professionnels", base: 0, rate: 0, amount: 0, employerAmount: 0, type: 'deduction', category: 'social' },
@@ -926,7 +956,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
               </div>
               <div className="w-48 text-right px-4 py-2.5 bg-green-100/50 rounded-lg border-2 border-green-100">
                 <span className="text-green-900 font-black text-xl tabular-nums">
-                  {customLines.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0).toLocaleString('fr-FR')}
+                  {totals.earnings.toLocaleString('fr-FR')}
                 </span>
                 <span className="text-green-700 text-xs font-bold ml-1">FCFA</span>
               </div>
@@ -1065,22 +1095,20 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
                 <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-1">
                   Salaire Brut
                 </span>
-                <span className="text-lg font-black tabular-nums">{customLines.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0).toLocaleString('fr-FR')} <span className="text-[10px] opacity-50">FCFA</span></span>
+                <span className="text-lg font-black tabular-nums">{totals.earnings.toLocaleString('fr-FR')} <span className="text-[10px] opacity-50">FCFA</span></span>
               </div>
               <div className="flex flex-col sm:pl-6 pt-4 sm:pt-0">
                 <span className="text-[10px] font-black text-red-400 uppercase tracking-[0.2em] mb-1">Retenues Sal.</span>
-                <span className="text-lg font-black tabular-nums text-red-200">{customLines.filter(l => l.type === 'deduction').reduce((acc, l) => acc + (Number(l.amount) || 0), 0).toLocaleString('fr-FR')} <span className="text-[10px] opacity-50">FCFA</span></span>
+                <span className="text-lg font-black tabular-nums text-red-200">{totals.deductions.toLocaleString('fr-FR')} <span className="text-[10px] opacity-50">FCFA</span></span>
               </div>
               <div className="flex flex-col sm:pl-6 pt-4 sm:pt-0">
                 <span className="text-[10px] font-black text-blue-300 uppercase tracking-[0.2em] mb-1">Charges Pat.</span>
-                <span className="text-lg font-black tabular-nums text-blue-100">{customLines.reduce((acc, l) => acc + (Number(l.employerAmount) || 0), 0).toLocaleString('fr-FR')} <span className="text-[10px] opacity-50">FCFA</span></span>
+                <span className="text-lg font-black tabular-nums text-blue-100">{totals.employerCharges.toLocaleString('fr-FR')} <span className="text-[10px] opacity-50">FCFA</span></span>
               </div>
               <div className="flex flex-col sm:pl-6 pt-4 sm:pt-0 bg-blue-500/10 -m-6 p-6 sm:bg-transparent sm:m-0 sm:p-0">
                 <span className="text-[10px] font-black text-yellow-400 uppercase tracking-[0.2em] mb-1">Net à Payer</span>
                 <span className="text-xl font-black tabular-nums text-blue-50 animate-pulse">
-                  {(customLines.filter(l => l.type === 'earning').reduce((acc, l) => acc + (Number(l.amount) || 0), 0) - 
-                    customLines.filter(l => l.type === 'deduction').reduce((acc, l) => acc + (Number(l.amount) || 0), 0)
-                  ).toLocaleString('fr-FR')} 
+                  {totals.net.toLocaleString('fr-FR')} 
                   <span className="text-[10px] opacity-50 ml-1">FCFA</span>
                 </span>
               </div>
