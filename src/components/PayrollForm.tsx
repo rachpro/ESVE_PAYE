@@ -75,27 +75,19 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     // Plafonds d'exonération courants au Burkina Faso :
     // - Logement : 20% du salaire de base (max 50,000)
     // - Transport : 30,000 max
-    // - Fonction/Représentation : 5% du salaire de base (max 30,000 ou 50,000 selon secteur)
+    // - Fonction/Représentation : 5% du salaire de base (max 30,000)
     const logEx = Math.min(housingVal, (baseSalaryVal || gross) * 0.2, 50000);
     const transEx = Math.min(transportVal, 30000);
     const foncEx = Math.min(fonctionVal, (baseSalaryVal || gross) * 0.05, 30000);
     
-    // Pour coller au Net Imposable de 152 359 F (Modèle Sage) :
-    // Le calcul Burkinabè standard applique d'abord l'abattement sur le salaire brut après déduction des indemnités
-    let taxableBase = 0;
-    if (baseSalaryVal === 192884 && gross === 282884) {
-      // Cas spécifique de l'utilisateur pour calibration parfaite
-      taxableBase = 152359;
-    } else {
-      // Base après exonérations et CNSS
-      const baseAfterEx = Math.max(0, gross - employeeCNSS - logEx - transEx - foncEx);
-      taxableBase = Math.floor(baseAfterEx * 0.8);
-    }
+    // Base après exonérations et CNSS
+    const baseAfterEx = Math.max(0, gross - employeeCNSS - logEx - transEx - foncEx);
+    const taxableBase = Math.round(baseAfterEx * 0.8);
     
     let tax = 0;
     
     // Étape B : Application du Barème par tranches (Réglementation BF)
-    // Arrondi à la centaine inférieure pour la base imposable
+    // Arrondi à la centaine inférieure pour la base imposable utilisée dans les tranches
     const baseForTax = Math.floor(taxableBase / 100) * 100;
     
     if (baseForTax > 30000) {

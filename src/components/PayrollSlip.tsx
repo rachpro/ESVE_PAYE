@@ -269,8 +269,7 @@ export const PayrollSlip: React.FC<PayrollSlipProps> = ({ data, autoDownload, on
                 <td className="p-1 px-1 text-center font-bold border-l-2 border-[#1e293b]">{line.nombre?.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) || (line.label === "SALAIRE BRUT" ? '' : '30,00')}</td>
                 <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b]">{line.base?.toLocaleString() || (line.label === "SALAIRE BRUT" ? line.amount.toLocaleString() : line.amount.toLocaleString())}</td>
                 <td className="p-1 px-1 text-center font-bold border-l border-[#1e293b] line-clamp-1">
-                  {line.rate ? line.rate.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) : 
-                  (line.label === "SALAIRE BRUT" ? '' : (line.label.toLowerCase().includes('base') || line.label.toLowerCase().includes('salaire') || line.label.toLowerCase().includes('indemnité') ? '3000,00' : ''))}
+                  {line.rate ? line.rate.toLocaleString('fr-FR', { minimumFractionDigits: 2 }) : ''}
                 </td>
                 <td className="p-1 px-1 text-right font-bold border-l border-[#1e293b]">{line.amount.toLocaleString()}</td>
                 <td className="p-1 px-1 text-right text-gray-300 border-l border-[#1e293b] border-r-2">—</td>
