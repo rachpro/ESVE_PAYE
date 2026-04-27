@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { Decharge } from '../types';
-import { Printer, Download, Eye, X, PenTool, Trash2, Save } from 'lucide-react';
+import { Printer, Download, Eye, X, PenTool, Trash2, Save, CheckCircle2 } from 'lucide-react';
 import html2canvas from 'html2canvas-pro';
 import { jsPDF } from 'jspdf';
 import { motion, AnimatePresence } from 'motion/react';
@@ -366,19 +366,27 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
             <div className="flex justify-between items-start">
               <div className="space-y-4">
                 <p className="font-bold underline">Pour ESVE (Cachet & Signature) :</p>
-                <div className="h-32 w-64 border border-dashed border-[#d1d5db] bg-[#f9fafb] flex items-center justify-center">
-                  <span className="text-[10px] text-[#94a3b8] no-print italic">Réservé à l'administration</span>
+                <div className="h-40 w-72 border-2 border-gray-300 rounded-lg flex flex-col items-center justify-end pb-4 bg-white relative">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10 pointer-events-none">
+                    <CheckCircle2 size={64} />
+                  </div>
+                  <div className="w-48 border-t border-gray-400 mt-2"></div>
+                  <span className="text-[10px] text-[#94a3b8] italic mt-1 uppercase tracking-tighter">Mention "Lu et approuvé"</span>
                 </div>
               </div>
 
               <div className="text-right space-y-4">
                 <p className="font-bold underline">Signature du bénéficiaire :</p>
-                <div className="h-32 w-64 border border-dashed border-[#d1d5db] ml-auto flex items-center justify-center relative overflow-hidden bg-[#f9fafb]">
+                <div className="h-40 w-72 border-2 border-gray-300 rounded-lg ml-auto flex flex-col items-center justify-end pb-4 bg-white relative overflow-hidden">
                   {data.signature ? (
-                    <img src={data.signature} alt="Signature" className="max-h-full max-w-full object-contain" />
+                    <img src={data.signature} alt="Signature" className="max-h-[80%] max-w-[90%] object-contain mb-2" />
                   ) : (
-                    <span className="text-[10px] text-[#94a3b8] no-print">Zone de signature</span>
+                    <div className="flex-1 flex items-center justify-center">
+                       <span className="text-[10px] text-[#cbd5e1] italic uppercase">Espace Signature</span>
+                    </div>
                   )}
+                  <div className="w-48 border-t border-gray-400"></div>
+                  <span className="text-[10px] text-[#94a3b8] italic mt-1 uppercase tracking-tighter">Bénéficiaire</span>
                 </div>
               </div>
             </div>
@@ -451,15 +459,22 @@ export const DechargeDocument: React.FC<DechargeDocumentProps> = ({ data, onUpda
                 <div className="flex justify-between items-start">
                   <div className="space-y-4">
                     <p className="font-bold underline">Pour ESVE (Cachet & Signature) :</p>
-                    <div className="h-32 w-64 border border-dashed border-[#d1d5db] bg-[#f9fafb] flex items-center justify-center">
-                      <span className="text-[10px] text-[#94a3b8] no-print italic uppercase">Réservé à ESVE</span>
+                    <div className="h-40 w-72 border-2 border-gray-300 rounded-lg flex flex-col items-center justify-end pb-4 bg-white">
+                      <div className="w-48 border-t border-gray-400 mt-2"></div>
+                      <span className="text-[10px] text-[#94a3b8] italic mt-1 uppercase">Administration</span>
                     </div>
                   </div>
 
                   <div className="text-right space-y-4">
                     <p className="font-bold underline">Signature du bénéficiaire :</p>
-                    <div className="h-32 w-64 border border-dashed border-[#d1d5db] ml-auto flex items-center justify-center relative overflow-hidden bg-[#f9fafb]">
-                      {data.signature && <img src={data.signature} alt="Signature Preview" className="max-h-full max-w-full object-contain" />}
+                    <div className="h-40 w-72 border-2 border-gray-300 rounded-lg ml-auto flex flex-col items-center justify-end pb-4 bg-white relative overflow-hidden">
+                      {data.signature ? (
+                        <img src={data.signature} alt="Signature Preview" className="max-h-[80%] max-w-[90%] object-contain mb-2" />
+                      ) : (
+                        <div className="flex-1"></div>
+                      )}
+                      <div className="w-48 border-t border-gray-400"></div>
+                      <span className="text-[10px] text-[#94a3b8] italic mt-1 uppercase">Bénéficiaire</span>
                     </div>
                   </div>
                 </div>
