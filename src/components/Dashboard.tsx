@@ -15,25 +15,8 @@ import {
   X as CloseIcon, 
   ChevronLeft, 
   ChevronRight, 
-  PlusCircle,
-  BarChart3,
-  LineChart as LineChartIcon,
-  PieChart as PieChartIcon
+  PlusCircle
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer, 
-  LineChart, 
-  Line, 
-  AreaChart, 
-  Area 
-} from 'recharts';
 import { PayrollSlipData, Decharge } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -70,38 +53,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [dechargePage, setDechargePage] = useState(1);
   const [selectedDecharges, setSelectedDecharges] = useState<string[]>([]);
   const ITEMS_PER_PAGE = 10;
-
-  // Chart Data Preparation
-  const chartData = useMemo(() => {
-    if (!history.length) return [];
-
-    // Group by period
-    const grouped = history.reduce((acc: any, slip) => {
-      const period = slip.period;
-      if (!acc[period]) {
-        acc[period] = {
-          period,
-          grossSalary: 0,
-          netPay: 0,
-          incomeTax: 0,
-          totalEmployeeCharges: 0,
-          totalEmployerCharges: 0,
-          count: 0
-        };
-      }
-      acc[period].grossSalary += slip.grossSalary || 0;
-      acc[period].netPay += slip.netPay || 0;
-      acc[period].incomeTax += slip.incomeTax || 0;
-      acc[period].totalEmployeeCharges += slip.totalEmployeeCharges || 0;
-      acc[period].totalEmployerCharges += slip.totalEmployerCharges || 0;
-      acc[period].count += 1;
-      return acc;
-    }, {});
-
-    // Sort periods (simplified: assumes they are in month-year format and mostly chronological in history)
-    // For a real app, we'd parse the date, but for now we'll take the keys
-    return Object.values(grouped);
-  }, [history]);
 
   const uniqueEmployeesObj = new Map();
   history.forEach(slip => {
@@ -213,125 +164,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         ))}
       </div>
-
-      {chartData.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Salary Evolution Chart */}
-          <div className="bg-white p-6 rounded-xl border border-[#e2e8f0] shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-sm font-bold text-[#1e293b] flex items-center gap-2 uppercase tracking-tight">
-                <LineChartIcon size={18} className="text-[#2563eb]" />
-                Evolution des Salaires
-              </h3>
-            </div>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorGross" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="period" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 600, fill: '#64748b' }} 
-                    dy={10}
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 600, fill: '#64748b' }}
-                    tickFormatter={(value) => `${value / 1000}k`}
-                  />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: any) => [`${value.toLocaleString('fr-FR')} FCFA`]}
-                  />
-                  <Legend verticalAlign="top" height={36}/>
-                  <Area 
-                    type="monotone" 
-                    dataKey="grossSalary" 
-                    name="Salaire Brut" 
-                    stroke="#2563eb" 
-                    strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorGross)" 
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="netPay" 
-                    name="Salaire Net" 
-                    stroke="#10b981" 
-                    strokeWidth={2}
-                    fillOpacity={0}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="incomeTax" 
-                    name="IUTS" 
-                    stroke="#f59e0b" 
-                    strokeWidth={2}
-                    fillOpacity={0}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Charges Evolution Chart */}
-          <div className="bg-white p-6 rounded-xl border border-[#e2e8f0] shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-sm font-bold text-[#1e293b] flex items-center gap-2 uppercase tracking-tight">
-                <BarChart3 size={18} className="text-[#2563eb]" />
-                Evolution des Charges
-              </h3>
-            </div>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis 
-                    dataKey="period" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 600, fill: '#64748b' }}
-                    dy={10}
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 600, fill: '#64748b' }}
-                    tickFormatter={(value) => `${value / 1000}k`}
-                  />
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: any) => [`${value.toLocaleString('fr-FR')} FCFA`]}
-                  />
-                  <Legend verticalAlign="top" height={36}/>
-                  <Bar 
-                    dataKey="totalEmployeeCharges" 
-                    name="Charges Salariales" 
-                    fill="#3b82f6" 
-                    radius={[4, 4, 0, 0]} 
-                    barSize={30}
-                  />
-                  <Bar 
-                    dataKey="totalEmployerCharges" 
-                    name="Charges Patronales" 
-                    fill="#94a3b8" 
-                    radius={[4, 4, 0, 0]} 
-                    barSize={30}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Bulletins History */}

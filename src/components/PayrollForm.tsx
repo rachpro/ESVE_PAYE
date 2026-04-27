@@ -66,27 +66,27 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     const taxableBase = Math.max(0, gross - employeeCNSS);
     let tax = 0;
     
-    // Étape B : Application du Barème par tranches (Moteur Sage OHADA)
-    // Rounding down to the nearest 100 as per standard BF procedure for IUTS
+    // Étape B : Application du Barème par tranches (Réglementation BF)
+    // Arrondi à la centaine inférieure pour la base imposable
     const baseForTax = Math.floor(taxableBase / 100) * 100;
     
     if (baseForTax > 30000) {
-      // 30,000 à 50,000 : 12.1%
+      // 30,001 à 50,000 : 12.1%
       tax += (Math.min(baseForTax, 50000) - 30000) * 0.121;
       if (baseForTax > 50000) {
-        // 50,000 à 80,000 : 13.9%
+        // 50,001 à 80,000 : 13.9%
         tax += (Math.min(baseForTax, 80000) - 50000) * 0.139;
         if (baseForTax > 80000) {
-          // 80,000 à 120,000 : 15.7%
+          // 80,001 à 120,000 : 15.7%
           tax += (Math.min(baseForTax, 120000) - 80000) * 0.157;
           if (baseForTax > 120000) {
-            // 120,000 à 170,000 : 18.4%
+            // 120,001 à 170,000 : 18.4%
             tax += (Math.min(baseForTax, 170000) - 120000) * 0.184;
             if (baseForTax > 170000) {
-              // 170,000 à 250,000 : 21.7%
+              // 170,001 à 250,000 : 21.7%
               tax += (Math.min(baseForTax, 250000) - 170000) * 0.217;
               if (baseForTax > 250000) {
-                // Au-dessus de 250,000 : 25% (sur le reste)
+                // Au-dessus de 250,000 : 25%
                 tax += (baseForTax - 250000) * 0.25;
               }
             }
@@ -95,7 +95,7 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
       }
     }
 
-    // Étape C : Tableau des réductions (Charges de famille)
+    // Étape C : Tableau des réductions d'impôt (Charges de famille)
     let reductionRate = 0;
     const numCharges = Number(charges);
     if (numCharges === 1) reductionRate = 0.08;
@@ -103,9 +103,11 @@ export const PayrollForm: React.FC<PayrollFormProps> = ({ employees, company, on
     else if (numCharges === 3) reductionRate = 0.12;
     else if (numCharges >= 4) reductionRate = 0.14;
     
+    // Application de la réduction sur le montant brut de l'impôt
     const incomeTax = Math.round(tax * (1 - reductionRate));
 
-    // FSP Calculation: 1% of the Net before FSP
+    // FSP (Fonds de Soutien Patriotique)
+    // Formule : salaire NET (avant FSP) * 1% = MONTANT FSP
     const netBeforeFSP = gross - employeeCNSS - incomeTax;
     const fsp = Math.max(0, Math.round(netBeforeFSP * 0.01));
     
